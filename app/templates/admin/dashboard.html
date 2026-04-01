@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %} — Admin{% endblock %}
+
+{% block content %}
+<div class="page fade-in">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Admin Central</h1>
+      <p class="page-subtitle">Full management control</p>
+    </div>
+    <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+      <input type="date" id="dateFrom" class="form-control" style="width:150px;">
+      <input type="date" id="dateTo" class="form-control" style="width:150px;">
+      <button class="btn btn-secondary" onclick="loadAdminDashboard()">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="adminTabs">
+    <button class="tab-btn active" id="tab-overview" onclick="switchAdminTab('overview')">📊 Overview</button>
+    <button class="tab-btn" id="tab-transactions" onclick="switchAdminTab('transactions')">💸 Transactions</button>
+    <button class="tab-btn" id="tab-categories" onclick="switchAdminTab('categories')">🏷️ Categories</button>
+    <button class="tab-btn" id="tab-users" onclick="switchAdminTab('users')">👥 Users</button>
+  </div>
+
+  <!-- Overview Tab -->
+  <div id="section-overview" class="fade-in">
+    <div class="stats-grid" id="summaryCards">
+      <div class="stat-card income skeleton" style="height:110px;"></div>
+      <div class="stat-card expense skeleton" style="height:110px;"></div>
+      <div class="stat-card balance skeleton" style="height:110px;"></div>
+      <div class="stat-card count skeleton" style="height:110px;"></div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-bottom:1.75rem;" class="charts-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">📈 Monthly Trend</span>
+          <input type="number" id="trendYear" class="form-control" style="width:90px;" value="" oninput="loadAdminCharts()">
+        </div>
+        <div class="card-body"><div class="chart-container"><canvas id="monthlyTrendChart"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🍩 By Category</span>
+          <select id="catChartType" class="form-control" style="width:120px;" onchange="loadAdminCharts()">
+            <option value="expense">Expenses</option>
+            <option value="income">Income</option>
+          </select>
+        </div>
+        <div class="card-body" style="display:flex;justify-content:center;">
+          <div class="chart-container" style="max-width:280px;"><canvas id="categoryChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Transactions (quick view) -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📋 Recent Activity</span>
+        <button class="btn btn-primary btn-sm" onclick="switchAdminTab('transactions')">View All →</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Category</th><th>Notes</th><th>Type</th><th style="text-align:right;">Amount</th></tr></thead>
+          <tbody id="recentTransactionsTable">
+            <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transactions Tab -->
+  <div id="section-transactions" style="display:none;" class="fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">💸 Manage Transactions</span>
+        <div style="display:flex;gap:.5rem;">
+          <button class="btn btn-outline btn-sm" onclick="exportCSV()">⬇️ CSV</button>
+          <button class="btn btn-primary btn-sm" onclick="openAddTxModal()">+ Add Transaction</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input type="text" id="searchTx" class="form-control" placeholder="🔍 Search notes..." oninput="debounce(()=>{adminTxPage=1;loadAdminTransactionsTable()},400)">
+        <select id="filterType" class="form-control" onchange="adminTxPage=1;loadAdminTransactionsTable()">
+          <option value="">All Types</option>
+          <option value="income">Income</option>
+          <option value="expense">Expense</option>
+        </select>
+        <input type="date" id="txFrom" class="form-control" onchange="loadAdminTransactionsTable()">
+        <input type="date" id="txTo" class="form-control" onchange="loadAdminTransactionsTable()">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Category</th><th>Notes</th><th>Type</th><th style="text-align:right;">Amount</th><th style="text-align:center;">Actions</th>
+          </tr></thead>
+          <tbody id="adminTransactionsTableBody">
+            <tr><td colspan="6" style="text-align:center;padding:3rem;color:var(--text-muted);">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.875rem 1rem;border-top:1px solid var(--border);background:#fafafa;">
+        <span id="adminTxMetaInfo" style="font-size:.8rem;color:var(--text-muted);"></span>
+        <div class="pagination" id="adminTxPagination"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Categories Tab -->
+  <div id="section-categories" style="display:none;" class="fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🏷️ Manage Categories</span>
+        <button class="btn btn-primary btn-sm" onclick="openAddCategoryModal()">+ Add Category</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Category Name</th><th style="text-align:right;">Actions</th></tr></thead>
+          <tbody id="categoriesTableBody">
+            <tr><td colspan="2" style="text-align:center;padding:2rem;color:var(--text-muted);">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Users Tab -->
+  <div id="section-users" style="display:none;" class="fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">👥 User Management</span>
+        <button class="btn btn-primary btn-sm" onclick="openAddUserModal()">+ Add User</button>
+      </div>
+      <div class="toolbar">
+        <input type="text" id="searchUser" class="form-control" placeholder="🔍 Search name or email..." oninput="debounce(()=>{userPage=1;loadUsersTable()},400)">
+        <select id="filterRole" class="form-control" onchange="userPage=1;loadUsersTable()">
+          <option value="">All Roles</option>
+          <option value="viewer">Viewer</option>
+          <option value="analyst">Analyst</option>
+          <option value="admin">Admin</option>
+        </select>
+        <select id="filterStatus" class="form-control" onchange="userPage=1;loadUsersTable()">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th style="text-align:right;">Actions</th>
+          </tr></thead>
+          <tbody id="usersTableBody">
+            <tr><td colspan="6" style="text-align:center;padding:3rem;color:var(--text-muted);">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.875rem 1rem;border-top:1px solid var(--border);background:#fafafa;">
+        <span id="userMetaInfo" style="font-size:.8rem;color:var(--text-muted);"></span>
+        <div class="pagination" id="userPagination"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('trendYear').value = new Date().getFullYear();
+    loadAdminDashboard();
+  });
+</script>
+<style>
+  @media(max-width:768px){ .charts-grid{ grid-template-columns:1fr !important; } }
+</style>
+{% endblock %}

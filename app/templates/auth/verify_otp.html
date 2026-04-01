@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %} — Verify OTP{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card fade-in">
+    <div class="auth-logo">
+      <div class="logo-icon">✉️</div>
+      <h1>Check your email</h1>
+      <p>We sent a 6-digit code to <strong id="displayEmail"></strong></p>
+    </div>
+
+    <form id="otpForm" onsubmit="handleVerifyOtp(event)">
+      <div class="form-group">
+        <label class="form-label" style="text-align:center; display:block; margin-bottom:.75rem;">Enter verification code</label>
+        <div class="otp-group" id="otpInputs">
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-input form-control" required>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-input form-control" required>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-input form-control" required>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-input form-control" required>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-input form-control" required>
+          <input type="text" inputmode="numeric" maxlength="1" class="otp-input form-control" required>
+        </div>
+        <span class="form-error" id="otpError" style="text-align:center; display:block; margin-top:.5rem;"></span>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block btn-lg" id="verifyBtn">Verify Email</button>
+    </form>
+
+    <div style="text-align:center; margin-top:1.25rem;">
+      <p style="font-size:.875rem; color:var(--text-muted);">
+        Didn't receive the code?
+        <button id="resendBtn" onclick="resendOtp()" style="color:var(--primary); background:none; border:none; cursor:pointer; font-weight:600; font-size:.875rem;">
+          Resend <span id="resendCountdown"></span>
+        </button>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

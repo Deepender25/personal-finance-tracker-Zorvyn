@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %} — Analytics{% endblock %}
+
+{% block content %}
+<div class="page fade-in">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Analytics Dashboard</h1>
+      <p class="page-subtitle">Deep insights into your financial data</p>
+    </div>
+    <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+      <input type="date" id="dateFrom" class="form-control" style="width:150px;">
+      <input type="date" id="dateTo" class="form-control" style="width:150px;">
+      <button class="btn btn-secondary" onclick="loadAnalystDashboard()">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="stats-grid" id="summaryCards">
+    <div class="stat-card income skeleton" style="height:100px;"></div>
+    <div class="stat-card expense skeleton" style="height:100px;"></div>
+    <div class="stat-card balance skeleton" style="height:100px;"></div>
+    <div class="stat-card count skeleton" style="height:100px;"></div>
+  </div>
+
+  <!-- Charts Row -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-bottom:1.75rem;" class="charts-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📈 Monthly Trend</span>
+        <input type="number" id="trendYear" class="form-control" style="width:90px;" placeholder="Year" value="{{ '' }}" oninput="loadAnalystCharts()">
+      </div>
+      <div class="card-body">
+        <div class="chart-container"><canvas id="monthlyTrendChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">🍩 By Category</span>
+        <select id="catChartType" class="form-control" style="width:120px;" onchange="loadAnalystCharts()">
+          <option value="expense">Expenses</option>
+          <option value="income">Income</option>
+        </select>
+      </div>
+      <div class="card-body" style="display:flex; justify-content:center;">
+        <div class="chart-container" style="max-width:280px;"><canvas id="categoryChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transactions Table -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📋 Transaction History</span>
+      <button class="btn btn-outline btn-sm" onclick="exportCSV()">⬇️ Export CSV</button>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="searchTx" class="form-control" placeholder="🔍 Search notes..." oninput="debounce(()=>{currentAnalystPage=1;loadTransactionsTable()},400)">
+      <select id="filterType" class="form-control" onchange="currentAnalystPage=1;loadTransactionsTable()">
+        <option value="">All Types</option>
+        <option value="income">Income</option>
+        <option value="expense">Expense</option>
+      </select>
+      <input type="date" id="txFrom" class="form-control" onchange="loadTransactionsTable()">
+      <input type="date" id="txTo" class="form-control" onchange="loadTransactionsTable()">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Date</th><th>Category</th><th>Notes</th><th>Type</th><th style="text-align:right;">Amount</th>
+        </tr></thead>
+        <tbody id="transactionsTableBody">
+          <tr><td colspan="5" style="text-align:center;padding:3rem;color:var(--text-muted);">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:.875rem 1rem; border-top:1px solid var(--border); background:#fafafa;">
+      <span id="txMetaInfo" style="font-size:.8rem; color:var(--text-muted);"></span>
+      <div class="pagination" id="txPagination"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', loadAnalystDashboard);
+  document.getElementById('trendYear').value = new Date().getFullYear();
+</script>
+<style>
+  @media(max-width:768px){ .charts-grid{ grid-template-columns:1fr !important; } }
+</style>
+{% endblock %}

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Dashboard {% block title %}{% endblock %}</title>
+  <meta name="description" content="Personal Finance Dashboard — track income and expenses with role-based access control.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+{% if user is defined and user %}
+<nav class="navbar">
+  <div class="navbar-brand">
+    <span>💰</span> FinanceDash
+  </div>
+  <div class="navbar-right">
+    <span style="color:rgba(255,255,255,.8); font-size:.875rem;">{{ user.name }}</span>
+    <span class="role-badge">{{ user.role }}</span>
+    <button class="btn-logout" onclick="logout()">Logout</button>
+  </div>
+</nav>
+{% endif %}
+
+<div id="toast-container"></div>
+
+{% block content %}{% endblock %}
+
+<!-- Global Modal Container -->
+<div id="modalBackdrop" class="modal-backdrop" onclick="closeModal(event)">
+  <div class="modal" id="modalBox">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modalTitle">Modal</h3>
+      <button class="modal-close" onclick="closeModalById()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
