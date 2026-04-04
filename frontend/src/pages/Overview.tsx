@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, ArrowDownRight, Users, Calendar, CreditCard, TrendingUp } from 'lucide-react';
 import { BentoBox } from '../components/BentoBox';
 import { Badge } from '../components/Badge';
@@ -12,6 +13,7 @@ export function Overview() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   const { viewRole } = useAuth();
   const canManage = viewRole === 'Admin' || viewRole === 'Analyst';
   const chartSpan = canManage ? 3 : 4;
@@ -133,16 +135,19 @@ export function Overview() {
           <BentoBox span={1} className="flex flex-col">
             <h3 className="text-lg font-semibold text-primary mb-4">Quick Actions</h3>
             <div className="space-y-3 flex-1">
-              <button className="w-full text-left px-4 py-3 rounded-xl bg-surface-hover border border-border-subtle hover:border-border-strong transition-colors flex items-center justify-between group">
+              <button onClick={() => navigate('/transactions', { state: { openModal: true } })}
+                className="w-full text-left px-4 py-3 rounded-xl bg-surface-hover border border-border-subtle hover:border-border-strong transition-colors flex items-center justify-between group">
                 <span className="text-sm font-medium">Add Transaction</span>
                 <ArrowUpRight className="w-4 h-4 text-muted group-hover:text-primary transition-colors" />
               </button>
-              <button className="w-full text-left px-4 py-3 rounded-xl bg-surface-hover border border-border-subtle hover:border-border-strong transition-colors flex items-center justify-between group">
+              <button onClick={() => navigate('/analytics')}
+                className="w-full text-left px-4 py-3 rounded-xl bg-surface-hover border border-border-subtle hover:border-border-strong transition-colors flex items-center justify-between group">
                 <span className="text-sm font-medium">Generate Report</span>
                 <ArrowUpRight className="w-4 h-4 text-muted group-hover:text-primary transition-colors" />
               </button>
               {viewRole === 'Admin' && (
-                <button className="w-full text-left px-4 py-3 rounded-xl bg-surface-hover border border-border-subtle hover:border-border-strong transition-colors flex items-center justify-between group">
+                <button onClick={() => navigate('/users')}
+                  className="w-full text-left px-4 py-3 rounded-xl bg-surface-hover border border-border-subtle hover:border-border-strong transition-colors flex items-center justify-between group">
                   <span className="text-sm font-medium">Manage Users</span>
                   <ArrowUpRight className="w-4 h-4 text-muted group-hover:text-primary transition-colors" />
                 </button>

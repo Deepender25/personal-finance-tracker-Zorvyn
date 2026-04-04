@@ -4,7 +4,7 @@ from datetime import datetime
 class TransactionService:
     
     @staticmethod
-    def get_transactions(type_filter=None, category_id=None, date_from=None, date_to=None, search=None, page=1, per_page=20):
+    def get_transactions(type_filter=None, category_id=None, tag_filter=None, date_from=None, date_to=None, search=None, page=1, per_page=20):
         offset = (page - 1) * per_page
         
         query = """
@@ -38,6 +38,10 @@ class TransactionService:
         if search:
             query += " AND (t.notes ILIKE %s)"
             params.append(f"%{search}%")
+            
+        if tag_filter:
+            query += " AND EXISTS (SELECT 1 FROM transaction_tags tt_f JOIN tags tg_f ON tt_f.tag_id = tg_f.id WHERE tt_f.transaction_id = t.id AND tg_f.name = %s)"
+            params.append(tag_filter)
             
         query += " GROUP BY t.id, c.name"
         

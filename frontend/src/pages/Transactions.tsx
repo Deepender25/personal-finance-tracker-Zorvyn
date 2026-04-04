@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { Search, Filter, Plus, MoreHorizontal, X, Pencil, Trash2 } from 'lucide-react';
 import { BentoBox } from '../components/BentoBox';
 import { Badge } from '../components/Badge';
@@ -12,18 +13,27 @@ interface TxForm {
   amount: string;
   type: 'income' | 'expense';
   category_id: string;
+  new_category_name: string;
   date: string;
   notes: string;
+  tags_string: string;
 }
 
 const emptyForm = (): TxForm => ({
-  amount: '', type: 'expense', category_id: '',
-  date: new Date().toISOString().split('T')[0], notes: '',
+  amount: '', type: 'expense', category_id: '', new_category_name: '',
+  date: new Date().toISOString().split('T')[0], notes: '', tags_string: ''
 });
 
 export function Transactions() {
   const { viewRole } = useAuth();
   const canManage = viewRole === 'Admin';
+  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  const tagFilter = searchParams.get('tag');
+  const catFilter = searchParams.get('category_id');
 
   const [transactions, setTransactions] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -37,14 +47,20 @@ export function Transactions() {
   const [showModal, setShowModal] = useState(false);
   const [editTx, setEditTx] = useState<any | null>(null);
   const [form, setForm] = useState<TxForm>(emptyForm());
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
     fetchApi('/categories').then((r) => { if (r?.data) setCategories(r.data); }).catch(() => {});
-  }, []);
+    if (location.state?.openModal && canManage) {
+      openCreate();
+      // clean state
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, canManage]);
 
-  useEffect(() => { fetchTransactions(); }, [page, typeFilter]);
+  useEffect(() => { fetchTransactions(); }, [page, typeFilter, tagFilter, catFilter]);
 
   useEffect(() => {
     const delay = setTimeout(() => { fetchTransactions(); }, 500);
@@ -56,6 +72,8 @@ export function Transactions() {
     let url = `/transactions?page=${page}&per_page=${meta.per_page}`;
     if (typeFilter !== 'All Types') url += `&type=${typeFilter.toLowerCase()}`;
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+    if (tagFilter) url += `&tag=${encodeURIComponent(tagFilter)}`;
+    if (catFilter) url += `&category_id=${encodeURIComponent(catFilter)}`;
     try {
       const res = await fetchApi(url);
       setTransactions(res.data);
@@ -75,16 +93,25 @@ export function Transactions() {
     return new Date(dateStr).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const openCreate = () => { setEditTx(null); setForm(emptyForm()); setFormError(''); setShowModal(true); };
+  const openCreate = () => { 
+    setEditTx(null); 
+    setForm(emptyForm()); 
+    setIsCreatingCategory(false);
+    setFormError(''); 
+    setShowModal(true); 
+  };
 
   const openEdit = (tx: any) => {
     setEditTx(tx);
+    setIsCreatingCategory(false);
     setForm({
       amount: String(tx.amount),
       type: tx.type as 'income' | 'expense',
       category_id: tx.category_id || '',
+      new_category_name: '',
       date: tx.date ? tx.date.split('T')[0] : new Date().toISOString().split('T')[0],
       notes: tx.notes || '',
+      tags_string: tx.tags ? tx.tags.join(', ') : ''
     });
     setFormError('');
     setShowModal(true);
@@ -92,15 +119,24 @@ export function Transactions() {
 
   const handleSave = async () => {
     if (!form.amount || !form.date) return setFormError('Amount and date are required.');
+    if (isCreatingCategory && !form.new_category_name.trim()) return setFormError('New category name is required.');
     setSaving(true); setFormError('');
     try {
-      const body = {
+      const parsedTags = form.tags_string.split(',').map(t => t.trim()).filter(Boolean);
+      const body: any = {
         amount: parseFloat(form.amount),
         type: form.type,
-        category_id: form.category_id || null,
         date: form.date,
         notes: form.notes || null,
+        tags: parsedTags,
       };
+      
+      if (isCreatingCategory) {
+        body.new_category_name = form.new_category_name.trim();
+      } else if (form.category_id) {
+        body.category_id = form.category_id;
+      }
+
       if (editTx) {
         await fetchApi(`/transactions/${editTx.id}`, { method: 'PUT', body: JSON.stringify(body) });
       } else {
@@ -157,6 +193,18 @@ export function Transactions() {
             />
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
+            {tagFilter && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm">
+                <span>Tag: {tagFilter}</span>
+                <button onClick={() => { searchParams.delete('tag'); setSearchParams(searchParams); }} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </div>
+            )}
+            {catFilter && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm">
+                <span>Category filtered</span>
+                <button onClick={() => { searchParams.delete('category_id'); setSearchParams(searchParams); }} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </div>
+            )}
             <select
               value={typeFilter}
               onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
@@ -183,6 +231,7 @@ export function Transactions() {
                   <th className="px-6 py-4 font-medium">Date</th>
                   <th className="px-6 py-4 font-medium">Amount</th>
                   <th className="px-6 py-4 font-medium">Type</th>
+                  <th className="px-6 py-4 font-medium">Tags</th>
                   {canManage && <th className="px-6 py-4 font-medium text-right">Actions</th>}
                 </tr>
               </thead>
@@ -208,6 +257,24 @@ export function Transactions() {
                         <Badge variant={tx.type === 'income' ? 'success' : 'danger'}>
                           {tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}
                         </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1">
+                          {(tx.tags || []).slice(0, 2).map((tag: string) => (
+                            <button
+                              key={tag}
+                              onClick={() => { searchParams.set('tag', tag); setSearchParams(searchParams); }}
+                              className="px-2 py-0.5 text-[10px] bg-primary/10 text-primary hover:bg-primary hover:text-black transition-colors rounded-full font-medium"
+                            >
+                              {tag}
+                            </button>
+                          ))}
+                          {(tx.tags || []).length > 2 && (
+                            <span className="px-2 py-0.5 text-[10px] bg-surface text-muted rounded-full">
+                              +{(tx.tags.length - 2)}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       {canManage && (
                         <td className="px-6 py-4 text-right">
@@ -273,17 +340,39 @@ export function Transactions() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-muted mb-1">Category (optional)</label>
-                <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                  className="w-full px-3 py-2 bg-black border border-border-subtle rounded-lg text-sm focus:outline-none focus:border-border-strong">
-                  <option value="">None</option>
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm text-muted">Category</label>
+                  <button 
+                    onClick={() => setIsCreatingCategory(!isCreatingCategory)} 
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {isCreatingCategory ? 'Use existing' : '+ Create new'}
+                  </button>
+                </div>
+                {isCreatingCategory ? (
+                  <input type="text" value={form.new_category_name} onChange={(e) => setForm({ ...form, new_category_name: e.target.value })}
+                    placeholder="E.g. Travel, Salary..."
+                    className="w-full px-3 py-2 bg-black border border-border-subtle rounded-lg text-sm focus:outline-none focus:border-border-strong" />
+                ) : (
+                  <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-black border border-border-subtle rounded-lg text-sm focus:outline-none focus:border-border-strong">
+                    <option value="">None</option>
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                )}
               </div>
-              <div>
-                <label className="block text-sm text-muted mb-1">Date</label>
-                <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="w-full px-3 py-2 bg-black border border-border-subtle rounded-lg text-sm focus:outline-none focus:border-border-strong" />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-muted mb-1">Date</label>
+                  <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    className="w-full px-3 py-2 bg-black border border-border-subtle rounded-lg text-sm focus:outline-none focus:border-border-strong" />
+                </div>
+                <div>
+                  <label className="block text-sm text-muted mb-1">Tags (comma-separated)</label>
+                  <input type="text" value={form.tags_string} onChange={(e) => setForm({ ...form, tags_string: e.target.value })}
+                    placeholder="e.g. food, weekly"
+                    className="w-full px-3 py-2 bg-black border border-border-subtle rounded-lg text-sm focus:outline-none focus:border-border-strong" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm text-muted mb-1">Notes (optional)</label>

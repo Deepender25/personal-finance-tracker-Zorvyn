@@ -14,9 +14,11 @@ import { Analytics } from './pages/Analytics';
 import { Transactions } from './pages/Transactions';
 import { Budgets } from './pages/Budgets';
 import { Recurring } from './pages/Recurring';
+import { Categories } from './pages/Categories';
+import { Tags } from './pages/Tags';
 import { Users } from './pages/Users';
+import { AuditLog } from './pages/AuditLog';
 import { Settings } from './pages/Settings';
-import { Placeholder } from './pages/Placeholder';
 
 export default function App() {
   return (
@@ -31,10 +33,10 @@ export default function App() {
             <Route path="transactions" element={<Transactions />} />
             <Route path="budgets" element={<Budgets />} />
             <Route path="recurring" element={<Recurring />} />
-            <Route path="categories" element={<Placeholder title="Categories" description="Configure transaction categories." />} />
-            <Route path="tags" element={<Placeholder title="Tags" description="Manage system tags." />} />
+            <Route path="categories" element={<Categories />} />
+            <Route path="tags" element={<Tags />} />
             <Route path="users" element={<Users />} />
-            <Route path="audit" element={<Placeholder title="Audit Log" description="System security and activity logs." />} />
+            <Route path="audit" element={<AuditLog />} />
             <Route path="settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

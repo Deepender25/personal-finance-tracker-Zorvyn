@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   CalendarDays, 
@@ -18,6 +18,7 @@ import { cn } from '../lib/utils';
 
 export function Sidebar() {
   const { user, logout, viewRole, setViewRole } = useAuth();
+  const navigate = useNavigate();
 
   if (!user) return null;
 
@@ -74,7 +75,10 @@ export function Sidebar() {
               {(['Admin', 'Analyst', 'Viewer'] as const).map((role) => (
                 <button
                   key={role}
-                  onClick={() => setViewRole(role)}
+                  onClick={() => {
+                    setViewRole(role);
+                    navigate('/');
+                  }}
                   className={cn(
                     "flex-1 text-[10px] py-1 rounded-md font-medium transition-colors",
                     viewRole === role ? "bg-border-strong text-primary" : "text-muted hover:text-primary"

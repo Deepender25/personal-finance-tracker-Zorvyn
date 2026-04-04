@@ -209,9 +209,9 @@ export function Analytics() {
         </BentoBox>
 
         {/* Category Distribution */}
-        <BentoBox span={1} className="h-[400px] flex flex-col">
-          <h3 className="text-lg font-semibold text-primary mb-2">Expenses by Category</h3>
-          <div className="flex-1 w-full relative min-h-0">
+        <BentoBox span={1} className="min-h-[400px] flex flex-col pt-6 px-6 pb-6 lg:p-6 overflow-visible">
+          <h3 className="text-lg font-semibold text-primary mb-6">Expenses by Category</h3>
+          <div className="flex-1 w-full relative min-h-[220px]">
             {categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -219,8 +219,8 @@ export function Analytics() {
                     data={categoryData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
+                    innerRadius={65}
+                    outerRadius={85}
                     paddingAngle={5}
                     dataKey="total"
                     nameKey="category"
@@ -240,8 +240,8 @@ export function Analytics() {
             ) : (
               <div className="flex h-full items-center justify-center text-muted text-sm">No expenses found</div>
             )}
-            
-            {/* Center text */}
+
+            {/* Center text overlay */}
             {categoryData.length > 0 && (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-2xl font-bold text-primary">{Math.max(1, Math.round(totalPieValue / 1000))}k</span>

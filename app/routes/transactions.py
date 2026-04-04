@@ -3,6 +3,7 @@ from app.services.transaction_service import TransactionService
 from app.middleware.rbac import token_required, roles_required
 from app.utils.response import success, error
 from app.utils.validators import validate_date, is_valid_uuid
+from app.models import get_db_cursor
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -11,6 +12,7 @@ transactions_bp = Blueprint('transactions', __name__)
 def get_transactions():
     type_filter = request.args.get('type')
     category_id = request.args.get('category_id')
+    tag_filter = request.args.get('tag')
     date_from = request.args.get('date_from')
     date_to = request.args.get('date_to')
     search = request.args.get('search')
@@ -18,7 +20,7 @@ def get_transactions():
     per_page = min(request.args.get('per_page', 20, type=int), 100)
 
     result = TransactionService.get_transactions(
-        type_filter, category_id, date_from, date_to, search, page, per_page
+        type_filter, category_id, tag_filter, date_from, date_to, search, page, per_page
     )
     return success(data=result['data'], meta=result['meta'])
 
@@ -54,7 +56,20 @@ def create_transaction():
     if not validate_date(data['date']):
         return error("Invalid date format. Use YYYY-MM-DD.", 400)
         
-    if data.get('category_id') and not is_valid_uuid(data['category_id']):
+    category_id = data.get('category_id')
+    if data.get('new_category_name'):
+        with get_db_cursor(commit=True) as cursor:
+            cursor.execute("SELECT id FROM categories WHERE name = %s", (data['new_category_name'],))
+            row = cursor.fetchone()
+            if row:
+                category_id = row['id']
+            else:
+                cursor.execute(
+                    "INSERT INTO categories (name, created_by) VALUES (%s, %s) RETURNING id", 
+                    (data['new_category_name'], request.current_user['user_id'])
+                )
+                category_id = cursor.fetchone()['id']
+    elif category_id and not is_valid_uuid(category_id):
          return error("Invalid category ID format", 400)
 
     tags = data.get('tags', [])
@@ -62,7 +77,7 @@ def create_transaction():
         return error("Tags must be a list of strings.", 400)
 
     tx = TransactionService.create_transaction(
-        amount, data['type'], data.get('category_id'), data['date'], 
+        amount, data['type'], category_id, data['date'], 
         data.get('notes'), request.current_user['user_id'], tags=tags
     )
     return success(data=tx, status=201)
@@ -84,6 +99,20 @@ def update_transaction(tx_id):
     amount = data.get('amount', valid_tx['amount'])
     tx_type = data.get('type', valid_tx['type'])
     category_id = data.get('category_id', valid_tx['category_id'])
+    
+    if data.get('new_category_name'):
+        with get_db_cursor(commit=True) as cursor:
+            cursor.execute("SELECT id FROM categories WHERE name = %s", (data['new_category_name'],))
+            row = cursor.fetchone()
+            if row:
+                category_id = row['id']
+            else:
+                cursor.execute(
+                    "INSERT INTO categories (name, created_by) VALUES (%s, %s) RETURNING id", 
+                    (data['new_category_name'], request.current_user['user_id'])
+                )
+                category_id = cursor.fetchone()['id']
+
     date = data.get('date', valid_tx['date'])
     notes = data.get('notes', valid_tx['notes'])
     tags = data.get('tags') # may be None to skip update
