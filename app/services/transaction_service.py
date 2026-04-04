@@ -4,7 +4,7 @@ from datetime import datetime
 class TransactionService:
     
     @staticmethod
-    def get_transactions(type_filter=None, category_id=None, tag_filter=None, date_from=None, date_to=None, search=None, page=1, per_page=20):
+    def get_transactions(type_filter=None, category_ids=None, tag_filters=None, date_from=None, date_to=None, search=None, page=1, per_page=20):
         offset = (page - 1) * per_page
         
         query = """
@@ -23,9 +23,11 @@ class TransactionService:
             query += " AND t.type = %s"
             params.append(type_filter)
             
-        if category_id:
-            query += " AND t.category_id = %s"
-            params.append(category_id)
+        if category_ids:
+            # category_ids is a list
+            placeholders = ', '.join(['%s'] * len(category_ids))
+            query += f" AND t.category_id IN ({placeholders})"
+            params.extend(category_ids)
             
         if date_from:
             query += " AND t.date >= %s"
@@ -39,9 +41,10 @@ class TransactionService:
             query += " AND (t.notes ILIKE %s)"
             params.append(f"%{search}%")
             
-        if tag_filter:
-            query += " AND EXISTS (SELECT 1 FROM transaction_tags tt_f JOIN tags tg_f ON tt_f.tag_id = tg_f.id WHERE tt_f.transaction_id = t.id AND tg_f.name = %s)"
-            params.append(tag_filter)
+        if tag_filters:
+            placeholders = ', '.join(['%s'] * len(tag_filters))
+            query += f" AND EXISTS (SELECT 1 FROM transaction_tags tt_f JOIN tags tg_f ON tt_f.tag_id = tg_f.id WHERE tt_f.transaction_id = t.id AND tg_f.name IN ({placeholders}))"
+            params.extend(tag_filters)
             
         query += " GROUP BY t.id, c.name"
         

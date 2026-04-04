@@ -32,11 +32,12 @@ export function Transactions() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  const tagFilter = searchParams.get('tag');
-  const catFilter = searchParams.get('category_id');
+  const tagFilters = searchParams.getAll('tag');
+  const catFilters = searchParams.getAll('category_id');
 
   const [transactions, setTransactions] = useState<any[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, total_pages: 1, per_page: 15 });
@@ -53,6 +54,7 @@ export function Transactions() {
 
   useEffect(() => {
     fetchApi('/categories').then((r) => { if (r?.data) setCategories(r.data); }).catch(() => {});
+    fetchApi('/tags').then((r) => { if (r?.data) setAvailableTags(r.data); }).catch(() => {});
     if (location.state?.openModal && canManage) {
       openCreate();
       // clean state
@@ -60,9 +62,11 @@ export function Transactions() {
     }
   }, [location.state, canManage]);
 
-  useEffect(() => { fetchTransactions(); }, [page, typeFilter, tagFilter, catFilter]);
+  useEffect(() => { fetchTransactions(); }, [page, typeFilter, searchParams]);
 
+  // Fix: Pagination search bug. Reset to page 1 whenever search changes, but let the effect handle fetching.
   useEffect(() => {
+    setPage(1);
     const delay = setTimeout(() => { fetchTransactions(); }, 500);
     return () => clearTimeout(delay);
   }, [searchTerm]);
@@ -72,8 +76,8 @@ export function Transactions() {
     let url = `/transactions?page=${page}&per_page=${meta.per_page}`;
     if (typeFilter !== 'All Types') url += `&type=${typeFilter.toLowerCase()}`;
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
-    if (tagFilter) url += `&tag=${encodeURIComponent(tagFilter)}`;
-    if (catFilter) url += `&category_id=${encodeURIComponent(catFilter)}`;
+    tagFilters.forEach(t => url += `&tag=${encodeURIComponent(t)}`);
+    catFilters.forEach(c => url += `&category_id=${encodeURIComponent(c)}`);
     try {
       const res = await fetchApi(url);
       setTransactions(res.data);
@@ -192,28 +196,91 @@ export function Transactions() {
               className="w-full pl-9 pr-4 py-2 bg-black/50 border border-border-subtle rounded-lg text-sm focus:outline-none focus:border-border-strong focus:ring-1 focus:ring-border-strong transition-colors"
             />
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            {tagFilter && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm">
-                <span>Tag: {tagFilter}</span>
-                <button onClick={() => { searchParams.delete('tag'); setSearchParams(searchParams); }} className="hover:text-white"><X className="w-3 h-3" /></button>
-              </div>
-            )}
-            {catFilter && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm">
-                <span>Category filtered</span>
-                <button onClick={() => { searchParams.delete('category_id'); setSearchParams(searchParams); }} className="hover:text-white"><X className="w-3 h-3" /></button>
-              </div>
-            )}
-            <select
-              value={typeFilter}
-              onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-              className="px-3 py-2 border border-border-subtle rounded-lg text-sm font-medium bg-black focus:outline-none w-full sm:w-auto"
-            >
-              <option>All Types</option>
-              <option>Income</option>
-              <option>Expense</option>
-            </select>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto items-start sm:items-center">
+            
+            <div className="flex flex-wrap items-center gap-2">
+              {tagFilters.map(t => (
+                <div key={`tag-${t}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-semibold">
+                  <span>{t}</span>
+                  <button onClick={() => { 
+                    const currentTags = searchParams.getAll('tag').filter(tx => tx !== t);
+                    searchParams.delete('tag');
+                    currentTags.forEach(tx => searchParams.append('tag', tx));
+                    setPage(1); setSearchParams(searchParams);
+                  }} className="hover:text-white transition-colors"><X className="w-3 h-3" /></button>
+                </div>
+              ))}
+              {catFilters.map(c => {
+                const categoryName = categories.find(cat => cat.id === c)?.name || c;
+                return (
+                  <div key={`cat-${c}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full text-xs font-semibold">
+                    <span>{categoryName}</span>
+                    <button onClick={() => { 
+                      const currentCats = searchParams.getAll('category_id').filter(cx => cx !== c);
+                      searchParams.delete('category_id');
+                      currentCats.forEach(cx => searchParams.append('category_id', cx));
+                      setPage(1); setSearchParams(searchParams);
+                    }} className="hover:text-white transition-colors"><X className="w-3 h-3" /></button>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              <select
+                value=""
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val && !catFilters.includes(val)) {
+                    searchParams.append('category_id', val);
+                    setPage(1); setSearchParams(searchParams);
+                  }
+                }}
+                className="px-3 py-2 border border-border-subtle rounded-lg text-sm font-medium bg-black focus:outline-none w-full sm:w-auto"
+              >
+                <option value="">+ Category</option>
+                {categories.filter(c => !catFilters.includes(c.id)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+
+              <select
+                value=""
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val && !tagFilters.includes(val)) {
+                    searchParams.append('tag', val);
+                    setPage(1); setSearchParams(searchParams);
+                  }
+                }}
+                className="px-3 py-2 border border-border-subtle rounded-lg text-sm font-medium bg-black focus:outline-none w-full sm:w-auto"
+              >
+                <option value="">+ Tag</option>
+                {availableTags.filter(t => !tagFilters.includes(t.name)).map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+              </select>
+
+              <select
+                value={typeFilter}
+                onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+                className="px-3 py-2 border border-border-subtle rounded-lg text-sm font-medium bg-black focus:outline-none w-full sm:w-auto"
+              >
+                <option value="All Types">All Types</option>
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+              </select>
+
+              {(tagFilters.length > 0 || catFilters.length > 0 || typeFilter !== 'All Types' || searchTerm !== '') && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setTypeFilter('All Types');
+                    setSearchParams(new URLSearchParams());
+                    setPage(1);
+                  }}
+                  className="px-3 py-2 text-sm text-red-400 hover:text-white hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 rounded-lg transition-colors whitespace-nowrap"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

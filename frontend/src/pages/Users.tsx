@@ -53,7 +53,12 @@ export function Users() {
     }
   };
 
-  useEffect(() => { loadUsers(); }, [search, roleFilter]);
+  useEffect(() => { loadUsers(); }, [roleFilter]);
+
+  useEffect(() => {
+    const delay = setTimeout(() => { loadUsers(); }, 500);
+    return () => clearTimeout(delay);
+  }, [search]);
 
   const handleCreate = async () => {
     if (!form.name || !form.email || !form.password || !form.role)

@@ -11,8 +11,8 @@ transactions_bp = Blueprint('transactions', __name__)
 @roles_required('viewer', 'analyst', 'admin')
 def get_transactions():
     type_filter = request.args.get('type')
-    category_id = request.args.get('category_id')
-    tag_filter = request.args.get('tag')
+    category_ids = request.args.getlist('category_id')
+    tag_filters = request.args.getlist('tag')
     date_from = request.args.get('date_from')
     date_to = request.args.get('date_to')
     search = request.args.get('search')
@@ -20,7 +20,7 @@ def get_transactions():
     per_page = min(request.args.get('per_page', 20, type=int), 100)
 
     result = TransactionService.get_transactions(
-        type_filter, category_id, tag_filter, date_from, date_to, search, page, per_page
+        type_filter, category_ids, tag_filters, date_from, date_to, search, page, per_page
     )
     return success(data=result['data'], meta=result['meta'])
 
