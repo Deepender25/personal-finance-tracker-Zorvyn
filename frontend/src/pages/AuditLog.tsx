@@ -90,7 +90,6 @@ export function AuditLog() {
             <option value="transaction">Transaction</option>
             <option value="budget">Budget</option>
             <option value="tag">Tag</option>
-            <option value="api_key">API Key</option>
           </select>
         </div>
 

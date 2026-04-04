@@ -49,38 +49,4 @@ def my_activity():
     return success(data=data)
 
 
-@profile_bp.route('/api-keys', methods=['GET'])
-@token_required
-def list_api_keys():
-    data = ProfileService.get_my_api_keys(request.current_user['user_id'])
-    return success(data=data)
 
-
-@profile_bp.route('/api-keys', methods=['POST'])
-@token_required
-def create_api_key():
-    data = request.get_json()
-    if not data or not data.get('label'):
-        return error("API key label is required.", 400)
-    label = data['label'].strip()
-    if len(label) < 1 or len(label) > 100:
-        return error("Label must be 1–100 characters.", 400)
-    permissions = data.get('permissions', ['read'])
-    if not isinstance(permissions, list):
-        return error("Permissions must be a list.", 400)
-
-    key_data = ProfileService.create_api_key(request.current_user['user_id'], label, permissions)
-    log_action('api_key.create', 'api_key', key_data['id'])
-    return success(data=key_data, status=201)
-
-
-@profile_bp.route('/api-keys/<key_id>', methods=['DELETE'])
-@token_required
-def revoke_api_key(key_id):
-    if not is_valid_uuid(key_id):
-        return error("Invalid key ID.", 400)
-    revoked = ProfileService.revoke_api_key(key_id, request.current_user['user_id'])
-    if not revoked:
-        return error("API key not found or not yours.", 404)
-    log_action('api_key.revoke', 'api_key', key_id)
-    return success(message="API key revoked.")
