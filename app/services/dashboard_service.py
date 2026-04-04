@@ -110,13 +110,13 @@ class DashboardService:
         res_data = []
         for d in data:
             date_str = d['date'].strftime('%b %d, %Y') if d['date'] else ''
-            amount_str = f"${float(d['amount']):,.2f}"
+            raw_amount = float(d['amount'])
             
             res_data.append({
                 'id': f"TXN-{d['id']}",
                 'description': d['notes'] or d['category_name'] or 'Transaction',
                 'date': date_str,
-                'amount': amount_str,
+                'amount': raw_amount,
                 'type': d['type'].capitalize(),
                 'status': 'Completed'
             })

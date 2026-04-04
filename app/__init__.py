@@ -35,6 +35,7 @@ def create_app():
     from app.routes.tags          import tags_bp
     from app.routes.profile       import profile_bp
     from app.routes.import_export import import_export_bp
+    from app.routes.recurring     import recurring_bp
 
     app.register_blueprint(analytics_bp,     url_prefix='/api/analytics')
     app.register_blueprint(audit_bp,         url_prefix='/api/audit')
@@ -42,6 +43,7 @@ def create_app():
     app.register_blueprint(tags_bp,          url_prefix='/api/tags')
     app.register_blueprint(profile_bp,       url_prefix='/api/me')
     app.register_blueprint(import_export_bp, url_prefix='/api/data')
+    app.register_blueprint(recurring_bp,     url_prefix='/api/recurring')
 
     # ── Frontend views ────────────────────────────────────────────
     from app.routes.views import views_bp
