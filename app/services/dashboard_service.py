@@ -27,9 +27,10 @@ class DashboardService:
             cursor.execute(query, params)
             res = dict(cursor.fetchone())
             
-        res['net_balance'] = float(res['total_income'] - res['total_expense'])
-        res['total_income'] = float(res['total_income'])
-        res['total_expense'] = float(res['total_expense'])
+        res['netBalance'] = float(res['total_income'] - res['total_expense'])
+        res['totalIncome'] = float(res['total_income'])
+        res['totalExpenses'] = float(res['total_expense'])
+        res['savingsRate'] = round((res['netBalance'] / res['totalIncome'] * 100) if res['totalIncome'] > 0 else 0, 1)
         return res
 
     @staticmethod
@@ -81,11 +82,16 @@ class DashboardService:
             cursor.execute(query, (year,))
             data = [dict(row) for row in cursor.fetchall()]
             
+        res_data = []
+        months = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         for d in data:
-            d['net'] = float(d['income'] - d['expense'])
-            d['income'] = float(d['income'])
-            d['expense'] = float(d['expense'])
-        return data
+            net_balance = float(d['income'] - d['expense'])
+            month_int = int(d['month'].split('-')[1])
+            res_data.append({
+                'name': months[month_int],
+                'value': net_balance
+            })
+        return res_data
 
     @staticmethod
     def get_recent():
@@ -101,8 +107,17 @@ class DashboardService:
             cursor.execute(query)
             data = [dict(row) for row in cursor.fetchall()]
             
+        res_data = []
         for d in data:
-            d['amount'] = float(d['amount'])
-            if d['date']:
-               d['date'] = d['date'].isoformat()
-        return data
+            date_str = d['date'].strftime('%b %d, %Y') if d['date'] else ''
+            amount_str = f"${float(d['amount']):,.2f}"
+            
+            res_data.append({
+                'id': f"TXN-{d['id']}",
+                'description': d['notes'] or d['category_name'] or 'Transaction',
+                'date': date_str,
+                'amount': amount_str,
+                'type': d['type'].capitalize(),
+                'status': 'Completed'
+            })
+        return res_data

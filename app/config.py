@@ -16,3 +16,12 @@ class Config:
     
     OTP_EXPIRY_MINUTES = int(os.environ.get('OTP_EXPIRY_MINUTES', 10))
     RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT', '100 per hour')
+    
+    # Token blacklist cleanup: tokens older than this are safe to ignore
+    TOKEN_BLACKLIST_CLEANUP_DAYS = int(os.environ.get('TOKEN_BLACKLIST_CLEANUP_DAYS', 7))
+    
+    # Maximum CSV import rows
+    MAX_IMPORT_ROWS = int(os.environ.get('MAX_IMPORT_ROWS', 5000))
+    
+    # Maximum file upload size (16MB)
+    MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))

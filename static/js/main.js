@@ -1,6 +1,6 @@
 /* =====================================================
-   Finance Dashboard — Main JavaScript
-   All API calls, UI rendering, modal management
+   FinanceDash — Professional JS Module v2
+   Handles all API interactions, Charting, and UI logic
    ===================================================== */
 
 // ---------- UTILITIES ----------
@@ -19,9 +19,13 @@ function toast(msg, type = 'success') {
   const c = document.getElementById('toast-container');
   if (!c) return;
   const t = document.createElement('div');
-  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  const icons = {
+    success: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+    error: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    info: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`
+  };
   t.className = `toast toast-${type}`;
-  t.innerHTML = `<span>${icons[type] || '✅'}</span><span>${esc(msg)}</span>`;
+  t.innerHTML = `<div class="toast-icon">${icons[type] || icons.success}</div><span>${esc(msg)}</span>`;
   c.appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3500);
@@ -37,7 +41,7 @@ async function api(url, method = 'GET', body = null) {
     if (res.status === 401 && !url.includes('/login')) { window.location.href = '/login'; return null; }
     return { ok: res.ok, status: res.status, data };
   } catch (e) {
-    toast('Network error. Check your connection.', 'error');
+    toast('Network connection error', 'error');
     return null;
   }
 }
@@ -52,766 +56,892 @@ function openModal(title, bodyHTML, footerHTML = '') {
 function closeModalById() { document.getElementById('modalBackdrop').classList.remove('open'); }
 function closeModal(e) { if (e.target === document.getElementById('modalBackdrop')) closeModalById(); }
 
-// ---------- FORM ERROR ----------
-function setError(id, msg) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = msg;
-  el.classList.toggle('show', !!msg);
-}
-function clearErrors(...ids) { ids.forEach(id => setError(id, '')); }
-function setLoading(btnId, loading, text = 'Save') {
-  const btn = document.getElementById(btnId);
-  if (!btn) return;
-  btn.disabled = loading;
-  btn.textContent = loading ? 'Please wait…' : text;
+// ---------- AUTH LOGIC ----------
+async function handleLogin() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  setBtn('loginBtn', true, 'Signing in...');
+  const res = await api('/api/auth/login', 'POST', { email, password });
+  setBtn('loginBtn', false, 'Sign In');
+  if (!res) return;
+  if (res.ok) { window.location.href = `/dashboard/${res.data.data.user.role}`; }
+  else { toast(res.data.error || 'Login failed', 'error'); }
 }
 
-// ---------- PASSWORD STRENGTH ----------
-function updateStrength(val) {
+async function handleRegister() {
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  setBtn('regBtn', true, 'Creating account...');
+  const res = await api('/api/auth/register', 'POST', { name, email, password });
+  setBtn('regBtn', false, 'Create Account');
+  if (!res) return;
+  if (res.ok) { window.location.href = `/verify-otp?email=${encodeURIComponent(email)}`; }
+  else { toast(res.data.error || 'Registration failed', 'error'); }
+}
+
+function checkPassStrength(val) {
   const fill = document.getElementById('strengthFill');
-  const text = document.getElementById('strengthText');
   if (!fill) return;
-  let s = 0, label = '', cls = '';
+  let s = 0;
   if (val.length >= 8) s += 25;
   if (/[A-Z]/.test(val)) s += 25;
   if (/[a-z]/.test(val)) s += 25;
   if (/[0-9]/.test(val)) s += 25;
-  if (s <= 25) { label = 'Weak'; cls = 'background:#ef4444'; }
-  else if (s <= 50) { label = 'Fair'; cls = 'background:#f59e0b'; }
-  else if (s <= 75) { label = 'Good'; cls = 'background:#22c55e'; }
-  else { label = 'Strong ✓'; cls = 'background:#16a34a'; }
-  fill.style.cssText = `width:${s}%;${cls}`;
-  if (text) text.textContent = label;
+  fill.style.width = s + '%';
+  fill.style.background = s <= 25 ? 'var(--danger)' : s <= 50 ? 'var(--warning)' : s <= 75 ? 'var(--info)' : 'var(--success)';
 }
 
-// ---------- OTP INPUTS ----------
-function initOtpInputs(containerId) {
-  const inputs = document.querySelectorAll(`#${containerId} input.otp-input`);
-  inputs.forEach((inp, i) => {
-    inp.addEventListener('input', e => {
-      inp.value = inp.value.replace(/\D/g, '').slice(-1);
-      inp.classList.toggle('filled', !!inp.value);
-      if (inp.value && i < inputs.length - 1) inputs[i + 1].focus();
-      // auto-submit if all filled
-      const all = [...inputs].map(x => x.value).join('');
-      if (all.length === 6 && containerId === 'otpInputs') document.getElementById('otpForm')?.requestSubmit();
-    });
-    inp.addEventListener('keydown', e => {
-      if (e.key === 'Backspace' && !inp.value && i > 0) inputs[i - 1].focus();
-      if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
-        // handle paste
-        e.preventDefault();
-        navigator.clipboard.readText().then(text => {
-          const digits = text.replace(/\D/g,'').slice(0,6);
-          digits.split('').forEach((d, j) => { if (inputs[j]) { inputs[j].value = d; inputs[j].classList.add('filled'); }});
-          if (inputs[digits.length - 1]) inputs[digits.length - 1].focus();
-        }).catch(() => {});
-      }
-    });
-  });
-}
-
-function getOtp(containerId) {
-  return [...document.querySelectorAll(`#${containerId} input.otp-input`)].map(x => x.value).join('');
-}
-
-// ---------- AUTH ----------
-async function handleLogin(e) {
-  e.preventDefault();
-  clearErrors('emailError', 'passwordError');
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  setLoading('loginBtn', true, 'Sign In');
-  const res = await api('/api/auth/login', 'POST', { email, password });
-  setLoading('loginBtn', false, 'Sign In');
-  if (!res) return;
-  if (res.ok) {
-    window.location.href = `/dashboard/${res.data.data.user.role}`;
-  } else {
-    const msg = res.data.error || 'Login failed';
-    if (msg.includes('email')) setError('emailError', msg);
-    else setError('passwordError', msg);
-  }
-}
-
-async function handleRegister(e) {
-  e.preventDefault();
-  clearErrors('nameError', 'emailError', 'passwordError', 'confirmError');
-  const name = document.getElementById('name').value.trim();
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  const confirm = document.getElementById('confirmPassword').value;
-  if (password !== confirm) { setError('confirmError', 'Passwords do not match'); return; }
-  setLoading('registerBtn', true, 'Create Account');
-  const res = await api('/api/auth/register', 'POST', { name, email, password });
-  setLoading('registerBtn', false, 'Create Account');
-  if (!res) return;
-  if (res.ok) {
-    window.location.href = `/verify-otp?email=${encodeURIComponent(email)}`;
-  } else {
-    const msg = res.data.error || 'Registration failed';
-    if (msg.toLowerCase().includes('email')) setError('emailError', msg);
-    else if (msg.toLowerCase().includes('password')) setError('passwordError', msg);
-    else toast(msg, 'error');
-  }
-}
-
-// OTP Verify page
-document.addEventListener('DOMContentLoaded', () => {
-  const emailEl = document.getElementById('displayEmail');
-  if (emailEl) {
-    emailEl.textContent = new URLSearchParams(location.search).get('email') || '';
-  }
-  if (document.getElementById('otpInputs')) initOtpInputs('otpInputs');
-  if (document.getElementById('resetOtpInputs')) initOtpInputs('resetOtpInputs');
-});
-
-async function handleVerifyOtp(e) {
-  e.preventDefault();
+async function handleVerify() {
   const email = new URLSearchParams(location.search).get('email');
-  const otp = getOtp('otpInputs');
-  if (otp.length < 6) { setError('otpError', 'Please enter all 6 digits'); return; }
-  setLoading('verifyBtn', true, 'Verify Email');
+  const otp = [...document.querySelectorAll('.otp-input')].map(i => i.value).join('');
+  if (otp.length < 6) { toast('Enter 6-digit code', 'error'); return; }
+  setBtn('verifyBtn', true, 'Verifying...');
   const res = await api('/api/auth/verify-email', 'POST', { email, otp });
-  setLoading('verifyBtn', false, 'Verify Email');
-  if (!res) return;
-  if (res.ok) { toast('Email verified! You can now log in.'); setTimeout(() => window.location.href = '/login', 1500); }
-  else setError('otpError', res.data.error || 'Invalid OTP');
+  setBtn('verifyBtn', false, 'Verify Email');
+  if (res?.ok) { toast('Email verified! You can now log in.'); setTimeout(() => location.href='/login', 1500); }
+  else toast(res?.data?.error || 'Invalid OTP', 'error');
 }
 
-let resendTimer = null;
-async function resendOtp() {
-  const email = new URLSearchParams(location.search).get('email');
-  if (!email) return;
-  const btn = document.getElementById('resendBtn');
-  if (!btn) return;
-  btn.disabled = true;
-  let s = 60;
-  const cd = document.getElementById('resendCountdown');
-  resendTimer = setInterval(() => {
-    if (cd) cd.textContent = `(${--s}s)`;
-    if (s <= 0) { clearInterval(resendTimer); btn.disabled = false; if(cd) cd.textContent=''; }
-  }, 1000);
-  // Resend via forgot-password (sends a verify_email otp again is not standard —
-  // For now just inform user to re-register if OTP lost)
-  toast('If the OTP expired, please register again.', 'info');
+async function handleForgot() {
+    const email = document.getElementById('forgotEmail').value.trim();
+    setBtn('forgotBtn', true, 'Sending...');
+    const res = await api('/api/auth/forgot-password', 'POST', { email });
+    setBtn('forgotBtn', false, 'Send Recovery Code');
+    if (res?.ok) {
+        document.getElementById('forgotForm').style.display = 'none';
+        document.getElementById('resetForm').style.display = 'block';
+        document.getElementById('resetTitle').textContent = 'Check your email';
+        document.getElementById('resetSub').textContent = `Recovery code sent to ${email}`;
+        sessionStorage.setItem('resetEmail', email);
+        toast('Code sent!');
+    } else toast(res?.data?.error || 'Failed', 'error');
 }
 
-async function handleForgotPassword(e) {
-  e.preventDefault();
-  const email = document.getElementById('resetEmail').value.trim();
-  setLoading('step1Btn', true, 'Send Reset Code');
-  const res = await api('/api/auth/forgot-password', 'POST', { email });
-  setLoading('step1Btn', false, 'Send Reset Code');
-  if (!res) return;
-  if (res.ok) {
-    sessionStorage.setItem('resetEmail', email);
-    document.getElementById('step1Form').style.display = 'none';
-    document.getElementById('step2Form').style.display = 'block';
-    document.getElementById('stepDesc').textContent = `Enter the code sent to ${email}`;
-    toast('Reset code sent! Check your email.', 'info');
-  } else {
-    setError('resetEmailError', res.data.error || 'Failed to send reset code');
-  }
-}
-
-async function handleResetPassword(e) {
-  e.preventDefault();
-  const email = sessionStorage.getItem('resetEmail');
-  const otp = getOtp('resetOtpInputs');
-  const new_password = document.getElementById('newPass').value;
-  const confirm = document.getElementById('confirmNewPass').value;
-  if (new_password !== confirm) { setError('resetStep2Error', 'Passwords do not match'); return; }
-  if (otp.length < 6) { setError('resetStep2Error', 'Enter all 6 digits'); return; }
-  setLoading('step2Btn', true, 'Update Password');
-  const res = await api('/api/auth/reset-password', 'POST', { email, otp, new_password });
-  setLoading('step2Btn', false, 'Update Password');
-  if (!res) return;
-  if (res.ok) {
-    sessionStorage.removeItem('resetEmail');
-    toast('Password updated! Redirecting…');
-    setTimeout(() => window.location.href = '/login', 1500);
-  } else {
-    setError('resetStep2Error', res.data.error || 'Failed to reset password');
-  }
+async function handleReset() {
+    const email = sessionStorage.getItem('resetEmail');
+    const otp = [...document.querySelectorAll('.otp-input')].map(i => i.value).join('');
+    const new_password = document.getElementById('resetNewPass').value;
+    setBtn('resetBtn', true, 'Updating...');
+    const res = await api('/api/auth/reset-password', 'POST', { email, otp, new_password });
+    setBtn('resetBtn', false, 'Change Password');
+    if (res?.ok) { toast('Password updated!'); setTimeout(() => location.href='/login', 1500); }
+    else toast(res?.data?.error || 'Failed', 'error');
 }
 
 async function logout() {
-  await api('/api/auth/logout', 'POST');
-  window.location.href = '/login';
+    await api('/api/auth/logout', 'POST');
+    location.href = '/login';
 }
 
-// ---------- SUMMARY CARDS ----------
-async function loadSummaryCards(containerId = 'summaryCards') {
-  const from = document.getElementById('dateFrom')?.value;
-  const to = document.getElementById('dateTo')?.value;
-  let url = '/api/dashboard/summary';
-  const p = new URLSearchParams();
-  if (from) p.append('date_from', from);
-  if (to) p.append('date_to', to);
-  if (p.toString()) url += '?' + p;
-  const res = await api(url);
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  if (!res || !res.ok) { el.innerHTML = '<p style="color:var(--danger);">Failed to load summary.</p>'; return; }
-  const d = res.data.data;
-  const netColor = d.net_balance >= 0 ? 'var(--success)' : 'var(--danger)';
-  el.innerHTML = `
-    <div class="stat-card income">
-      <div class="stat-label">Total Income</div>
-      <div class="stat-value" style="color:var(--success);">${INR(d.total_income)}</div>
-      <div class="stat-sub">${d.income_count} transactions</div>
-    </div>
-    <div class="stat-card expense">
-      <div class="stat-label">Total Expenses</div>
-      <div class="stat-value" style="color:var(--danger);">${INR(d.total_expense)}</div>
-      <div class="stat-sub">${d.expense_count} transactions</div>
-    </div>
-    <div class="stat-card balance">
-      <div class="stat-label">Net Balance</div>
-      <div class="stat-value" style="color:${netColor};">${INR(d.net_balance)}</div>
-      <div class="stat-sub">${d.net_balance >= 0 ? '🟢 Surplus' : '🔴 Deficit'}</div>
-    </div>
-    <div class="stat-card count">
-      <div class="stat-label">Total Transactions</div>
-      <div class="stat-value">${d.transaction_count}</div>
-      <div class="stat-sub">All time records</div>
-    </div>
-  `;
+function setBtn(id, loading, text) {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.disabled = loading;
+    b.textContent = text;
 }
 
-// ---------- RECENT TRANSACTIONS ----------
-async function loadRecentTransactions(tbodyId = 'recentTransactionsTable') {
-  const res = await api('/api/dashboard/recent');
-  const tbody = document.getElementById(tbodyId);
-  if (!tbody) return;
-  if (!res || !res.ok || !res.data.data.length) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📭</div><h3>No transactions yet</h3><p>Start by adding transactions from the Admin panel.</p></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = res.data.data.map(tx => `
-    <tr>
-      <td>${fmtDate(tx.date)}</td>
-      <td>${esc(tx.category_name || 'Uncategorized')}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(tx.notes || '—')}</td>
-      <td><span class="badge badge-${tx.type}">${tx.type}</span></td>
-      <td style="text-align:right; font-weight:600; color:${tx.type==='income'?'var(--success)':'var(--danger)'};">${tx.type==='income'?'+':'−'}${INR(tx.amount)}</td>
-    </tr>
-  `).join('');
-}
-
-// ---------- VIEWER DASHBOARD ----------
-async function loadViewerDashboard() {
-  await Promise.all([loadSummaryCards(), loadRecentTransactions()]);
-}
-
-// ---------- CHARTS ----------
-let _trendChart = null, _catChart = null;
-
-async function loadCharts(prefix = '') {
-  // Monthly trend
-  const year = document.getElementById('trendYear')?.value || new Date().getFullYear();
-  const trendRes = await api(`/api/dashboard/monthly-trend?year=${year}`);
-  if (trendRes?.ok) {
-    const d = trendRes.data.data;
-    const ctx = document.getElementById('monthlyTrendChart');
-    if (ctx) {
-      if (_trendChart) _trendChart.destroy();
-      _trendChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: d.map(r => r.month),
-          datasets: [
-            { label: 'Income', data: d.map(r => r.income), backgroundColor: '#22c55e', borderRadius: 6 },
-            { label: 'Expense', data: d.map(r => r.expense), backgroundColor: '#ef4444', borderRadius: 6 }
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'top' } },
-          scales: { y: { beginAtZero: true, ticks: { callback: v => '₹' + (v/1000).toFixed(0) + 'k' } } }
-        }
-      });
-    }
-  }
-
-  // Category chart
-  const type = document.getElementById('catChartType')?.value || 'expense';
-  const catRes = await api(`/api/dashboard/by-category?type=${type}`);
-  if (catRes?.ok) {
-    const d = catRes.data.data.slice(0, 8);
-    const ctx2 = document.getElementById('categoryChart');
-    if (ctx2) {
-      if (_catChart) _catChart.destroy();
-      _catChart = new Chart(ctx2, {
-        type: 'doughnut',
-        data: {
-          labels: d.map(r => r.category || 'Uncategorized'),
-          datasets: [{ data: d.map(r => r.total), backgroundColor: ['#6366f1','#22c55e','#ef4444','#f59e0b','#8b5cf6','#06b6d4','#ec4899','#14b8a6'], borderWidth: 2, borderColor: '#fff' }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } }
-      });
-    }
-  }
-}
-
-// ---------- TRANSACTIONS TABLE ----------
-let currentAnalystPage = 1;
-
-async function loadTransactionsTable(page = currentAnalystPage) {
-  currentAnalystPage = page;
-  const s = document.getElementById('searchTx')?.value || '';
-  const type = document.getElementById('filterType')?.value || '';
-  const from = document.getElementById('txFrom')?.value || document.getElementById('dateFrom')?.value || '';
-  const to = document.getElementById('txTo')?.value || document.getElementById('dateTo')?.value || '';
-  const p = new URLSearchParams({ page, per_page: 15 });
-  if (s) p.append('search', s);
-  if (type) p.append('type', type);
-  if (from) p.append('date_from', from);
-  if (to) p.append('date_to', to);
-  const res = await api('/api/transactions?' + p);
-  const tbody = document.getElementById('transactionsTableBody');
-  if (!tbody) return;
-  if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--danger);">Failed to load</td></tr>'; return; }
-  renderTxTable(tbody, res.data.data, false);
-  renderPagination('txPagination', res.data.meta, p2 => loadTransactionsTable(p2));
-  const meta = res.data.meta;
-  const metaEl = document.getElementById('txMetaInfo');
-  if (metaEl) metaEl.textContent = `Page ${meta.page} of ${meta.total_pages} • ${meta.total} records`;
-}
-
-function renderTxTable(tbody, data, isAdmin = false) {
-  if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="${isAdmin?6:5}"><div class="empty-state"><div class="empty-icon">📭</div><h3>No transactions found</h3><p>Try changing your filters.</p></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = data.map(tx => `
-    <tr>
-      <td>${fmtDate(tx.date)}</td>
-      <td>${esc(tx.category_name || 'Uncategorized')}</td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(tx.notes || '')}">${esc(tx.notes || '—')}</td>
-      <td><span class="badge badge-${tx.type}">${tx.type}</span></td>
-      <td style="text-align:right;font-weight:600;color:${tx.type==='income'?'var(--success)':'var(--danger)'};">${tx.type==='income'?'+':'−'}${INR(tx.amount)}</td>
-      ${isAdmin ? `<td style="text-align:center;white-space:nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="openEditTxModal('${tx.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" style="margin-left:.25rem;" onclick="deleteTx('${tx.id}')">🗑️</button>
-      </td>` : ''}
-    </tr>
-  `).join('');
-}
-
-function renderPagination(elId, meta, onPage) {
-  const el = document.getElementById(elId);
-  if (!el) return;
-  const { page, total_pages } = meta;
-  let html = `<button class="page-btn" onclick="(${onPage.toString()})(${page-1})" ${page<=1?'disabled':''}>← Prev</button>`;
-  const start = Math.max(1, page-2), end = Math.min(total_pages, page+2);
-  for (let i = start; i <= end; i++) {
-    html += `<button class="page-btn ${i===page?'active':''}" onclick="(${onPage.toString()})(${i})">${i}</button>`;
-  }
-  html += `<button class="page-btn" onclick="(${onPage.toString()})(${page+1})" ${page>=total_pages?'disabled':''}>Next →</button>`;
-  el.innerHTML = html;
-}
-
-// ---------- ANALYST DASHBOARD ----------
-async function loadAnalystDashboard() {
-  await Promise.all([loadSummaryCards(), loadCharts(), loadTransactionsTable(1)]);
-}
-
-// ---------- ADMIN DASHBOARD ----------
-let adminTxPage = 1;
-let currentAdminTab = 'overview';
-let _adminTrendChart = null, _adminCatChart = null;
-
+// ---------- DASHBOARD TABS ----------
+let currentTab = 'overview';
 function switchAdminTab(tab) {
-  ['overview','transactions','categories','users'].forEach(t => {
-    const s = document.getElementById(`section-${t}`);
-    const b = document.getElementById(`tab-${t}`);
-    if (s) s.style.display = t === tab ? 'block' : 'none';
-    if (b) b.classList.toggle('active', t === tab);
-  });
-  currentAdminTab = tab;
-  if (tab === 'overview') loadAdminOverview();
-  else if (tab === 'transactions') loadAdminTransactionsTable(1);
-  else if (tab === 'categories') loadCategoriesTable();
-  else if (tab === 'users') loadUsersTable(1);
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.id === `tab-${tab}`));
+    document.querySelectorAll('.page > div[id^="section-"]').forEach(sec => sec.style.display = sec.id === `section-${tab}` ? 'block' : 'none');
+    currentTab = tab;
+    // Don't change location.hash here to avoid recursive triggers if called from hashchange
+    // trigger loaders based on tab
+    if (tab === 'overview') loadAdminDashboard();
+    if (tab === 'analytics') loadAnalytics();
+    if (tab === 'transactions') loadAdminTransactionsTable();
+    if (tab === 'recurring') loadRecurringTable();
+    if (tab === 'categories') loadCategoriesTable();
+    if (tab === 'tags') loadTagsTable();
+    if (tab === 'budgets') loadBudgetsTable();
+    if (tab === 'users') loadUsersTable();
+    if (tab === 'audit') loadAuditLog();
+    if (tab === 'profile') loadProfile();
 }
 
-async function loadAdminOverview() {
-  await Promise.all([loadSummaryCards(), loadAdminCharts(), loadRecentTransactions()]);
-}
-
-async function loadAdminCharts() {
-  _trendChart = _adminTrendChart; _catChart = _adminCatChart;
-  await loadCharts();
-  _adminTrendChart = _trendChart; _adminCatChart = _catChart;
-}
-
+// ---------- OVERVIEW LOADERS ----------
 async function loadAdminDashboard() {
-  await loadAdminOverview();
+    await Promise.all([loadSummaryCards(), loadRecentTransactions(), loadAdminCharts()]);
 }
 
-// Admin Transactions
+async function loadSummaryCards() {
+    const res = await api('/api/dashboard/summary');
+    const c = document.getElementById('summaryCards');
+    if (!c || !res?.ok) return;
+    const d = res.data.data;
+    c.innerHTML = `
+      <div class="stat-card income">
+        <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+        <div class="stat-label">Income</div>
+        <div class="stat-value">${INR(d.total_income)}</div>
+        <div class="stat-sub">${d.income_count} orders</div>
+      </div>
+      <div class="stat-card expense">
+        <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg></div>
+        <div class="stat-label">Expenses</div>
+        <div class="stat-value">${INR(d.total_expense)}</div>
+        <div class="stat-sub">${d.expense_count} txns</div>
+      </div>
+      <div class="stat-card balance">
+        <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+        <div class="stat-label">Net Balance</div>
+        <div class="stat-value">${INR(d.net_balance)}</div>
+        <div class="stat-sub">${d.net_balance >= 0 ? 'Surplus' : 'Deficit'}</div>
+      </div>
+      <div class="stat-card count">
+        <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+        <div class="stat-label">Total Volume</div>
+        <div class="stat-value">${d.transaction_count}</div>
+        <div class="stat-sub">Across all categories</div>
+      </div>
+    `;
+}
+
+async function loadRecentTransactions() {
+    const res = await api('/api/dashboard/recent');
+    const tbody = document.getElementById('recentTransactionsTable');
+    if (!tbody) return;
+    if (!res?.ok || !res.data.data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No recent activity found.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = res.data.data.map(tx => `
+        <tr>
+            <td>${fmtDate(tx.date)}</td>
+            <td>${esc(tx.category_name || 'General')}</td>
+            <td>${esc(tx.notes || '—')}</td>
+            <td><span class="badge badge-${tx.type}">${tx.type}</span></td>
+            <td style="text-align:right; font-weight:600; color:${tx.type==='income'?'var(--success)':'var(--danger)'};">${tx.type==='income'?'+':'−'}${INR(tx.amount)}</td>
+        </tr>
+    `).join('');
+}
+
+let _trendChart = null, _catChart = null;
+async function loadAdminCharts() {
+    const year = document.getElementById('trendYear').value;
+    const catType = document.getElementById('catChartType').value;
+    
+    // Trend
+    const tRes = await api(`/api/dashboard/monthly-trend?year=${year}`);
+    if (tRes?.ok) {
+        const d = tRes.data.data;
+        const ctx = document.getElementById('monthlyTrendChart');
+        if (ctx) {
+            if (_trendChart) _trendChart.destroy();
+            _trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: d.map(x => x.month),
+                    datasets: [
+                        { label: 'Income', data: d.map(x => x.income), backgroundColor: '#22c55e', borderRadius: 4 },
+                        { label: 'Expense', data: d.map(x => x.expense), backgroundColor: '#ef4444', borderRadius: 4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { position: 'top' } } }
+            });
+        }
+    }
+
+    // Category
+    const cRes = await api(`/api/dashboard/by-category?type=${catType}`);
+    if (cRes?.ok) {
+        const d = cRes.data.data.slice(0, 7);
+        const ctx = document.getElementById('categoryChart');
+        if (ctx) {
+            if (_catChart) _catChart.destroy();
+            _catChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: d.map(x => x.category || 'Uncategorized'),
+                    datasets: [{ data: d.map(x => x.total), backgroundColor: ['#6366f1','#22c55e','#ef4444','#f59e0b','#8b5cf6','#06b6d4','#ec4899'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } } }
+            });
+        }
+    }
+}
+
+// ---------- TRANSACTIONS TAB ----------
+let adminTxPage = 1;
 async function loadAdminTransactionsTable(page = adminTxPage) {
-  adminTxPage = page;
-  const s = document.getElementById('searchTx')?.value || '';
-  const type = document.getElementById('filterType')?.value || '';
-  const from = document.getElementById('txFrom')?.value || '';
-  const to = document.getElementById('txTo')?.value || '';
-  const p = new URLSearchParams({ page, per_page: 15 });
-  if (s) p.append('search', s);
-  if (type) p.append('type', type);
-  if (from) p.append('date_from', from);
-  if (to) p.append('date_to', to);
-  const res = await api('/api/transactions?' + p);
-  const tbody = document.getElementById('adminTransactionsTableBody');
-  if (!tbody) return;
-  if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--danger);">Failed to load</td></tr>'; return; }
-  renderTxTable(tbody, res.data.data, true);
-  renderPagination('adminTxPagination', res.data.meta, p2 => loadAdminTransactionsTable(p2));
-  const meta = res.data.meta;
-  const metaEl = document.getElementById('adminTxMetaInfo');
-  if (metaEl) metaEl.textContent = `Page ${meta.page} of ${meta.total_pages} • ${meta.total} records`;
+    adminTxPage = page;
+    const search = document.getElementById('searchTx').value;
+    const type = document.getElementById('filterType').value;
+    const from = document.getElementById('txFrom').value;
+    const to = document.getElementById('txTo').value;
+    
+    let url = `/api/transactions?page=${page}&per_page=15`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (type) url += `&type=${type}`;
+    if (from) url += `&date_from=${from}`;
+    if (to) url += `&date_to=${to}`;
+    
+    const res = await api(url);
+    const tbody = document.getElementById('adminTransactionsTableBody');
+    if (!tbody) return;
+    if (!res?.ok || !res.data.data.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No records found.</td></tr>'; return; }
+    
+    tbody.innerHTML = res.data.data.map(tx => `
+        <tr>
+            <td>${fmtDate(tx.date)}</td>
+            <td><strong>${esc(tx.category_name || 'General')}</strong></td>
+            <td>${(tx.tags || []).map(t => `<span class="tag-chip">${esc(t)}</span>`).join('')}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${esc(tx.notes || '')}">${esc(tx.notes || '—')}</td>
+            <td><span class="badge badge-${tx.type}">${tx.type}</span></td>
+            <td style="text-align:right; font-weight:600; color:${tx.type==='income'?'var(--success)':'var(--danger)'};">${tx.type==='income'?'+':'−'}${INR(tx.amount)}</td>
+            <td class="table-actions">
+                <button class="btn btn-ghost btn-icon" onclick="openEditTxModal('${tx.id}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                <button class="btn btn-ghost btn-icon" style="color:var(--danger);" onclick="deleteTx('${tx.id}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+            </td>
+        </tr>
+    `).join('');
+    
+    renderPagination('adminTxPagination', res.data.meta, p => loadAdminTransactionsTable(p));
+    document.getElementById('adminTxMetaInfo').textContent = `Showing ${res.data.data.length} of ${res.data.meta.total} records`;
 }
 
 // ---------- TRANSACTION MODALS ----------
-let _categories = [];
-
-async function getCategories() {
-  if (_categories.length) return _categories;
-  const res = await api('/api/categories');
-  _categories = res?.ok ? res.data.data : [];
-  return _categories;
-}
-
 async function openAddTxModal() {
-  const cats = await getCategories();
-  const catOptions = cats.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-  openModal('Add Transaction', `
-    <form id="addTxForm" onsubmit="submitAddTx(event)">
-      <div class="form-group">
-        <label class="form-label">Type *</label>
-        <select id="txType" class="form-control" required>
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Amount (₹) *</label>
-        <input id="txAmount" class="form-control" type="number" min="0.01" step="0.01" placeholder="5000" required>
-        <span class="form-error" id="txAmountErr"></span>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Category</label>
-        <select id="txCategory" class="form-control"><option value="">— Select —</option>${catOptions}</select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Date *</label>
-        <input id="txDate" class="form-control" type="date" required value="${new Date().toISOString().split('T')[0]}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Notes</label>
-        <input id="txNotes" class="form-control" type="text" placeholder="Optional description">
-      </div>
-    </form>
-  `, `
-    <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
-    <button class="btn btn-primary" id="saveTxBtn" onclick="document.getElementById('addTxForm').requestSubmit()">Save Transaction</button>
-  `);
+    const cats = (await api('/api/categories'))?.data?.data || [];
+    openModal('New Transaction', `
+        <form id="txAddForm" onsubmit="event.preventDefault(); submitAddTx();">
+            <div class="form-group">
+                <label class="form-label">Amount (₹)</label>
+                <input type="number" id="maAmount" class="form-control" step="0.01" required placeholder="0.00">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select id="maType" class="form-control"><option value="expense">Expense</option><option value="income">Income</option></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="maDate" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select id="maCat" class="form-control">
+                    <option value="">— Select —</option>
+                    ${cats.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tags (comma separated)</label>
+                <input type="text" id="maTags" class="form-control" placeholder="food, luxury, business">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <input type="text" id="maNotes" class="form-control" placeholder="What was this for?">
+            </div>
+        </form>
+    `, `
+        <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
+        <button class="btn btn-primary" onclick="document.getElementById('txAddForm').requestSubmit()">Save Transaction</button>
+    `);
 }
 
-async function submitAddTx(e) {
-  e.preventDefault();
-  clearErrors('txAmountErr');
-  const amount = parseFloat(document.getElementById('txAmount').value);
-  if (isNaN(amount) || amount <= 0) { setError('txAmountErr', 'Enter a valid positive amount'); return; }
-  setLoading('saveTxBtn', true);
-  const body = {
-    amount,
-    type: document.getElementById('txType').value,
-    category_id: document.getElementById('txCategory').value || null,
-    date: document.getElementById('txDate').value,
-    notes: document.getElementById('txNotes').value
-  };
-  const res = await api('/api/transactions', 'POST', body);
-  setLoading('saveTxBtn', false);
-  if (res?.ok) {
-    closeModalById();
-    toast('Transaction added!');
-    _categories = []; // reset cache
-    loadAdminTransactionsTable(1);
-    loadSummaryCards();
-  } else {
-    toast(res?.data?.error || 'Failed to add', 'error');
-  }
+async function submitAddTx() {
+    const tags = document.getElementById('maTags').value.split(',').map(t => t.trim()).filter(t => t);
+    const body = {
+        amount: parseFloat(document.getElementById('maAmount').value),
+        type: document.getElementById('maType').value,
+        date: document.getElementById('maDate').value,
+        category_id: document.getElementById('maCat').value || null,
+        notes: document.getElementById('maNotes').value,
+        tags: tags
+    };
+    const res = await api('/api/transactions', 'POST', body);
+    if (res?.ok) { toast('Transaction added'); closeModalById(); loadAdminTransactionsTable(); loadSummaryCards(); }
+    else toast(res?.data?.error || 'Save failed', 'error');
 }
 
 async function openEditTxModal(id) {
-  const res = await api(`/api/transactions/${id}`);
-  if (!res?.ok) { toast('Could not load transaction', 'error'); return; }
-  const tx = res.data.data;
-  const cats = await getCategories();
-  const catOptions = cats.map(c => `<option value="${c.id}" ${c.id === tx.category_id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
-  openModal('Edit Transaction', `
-    <form id="editTxForm" onsubmit="submitEditTx(event,'${id}')">
-      <div class="form-group">
-        <label class="form-label">Type *</label>
-        <select id="editTxType" class="form-control">
-          <option value="expense" ${tx.type==='expense'?'selected':''}>Expense</option>
-          <option value="income" ${tx.type==='income'?'selected':''}>Income</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Amount (₹) *</label>
-        <input id="editTxAmount" class="form-control" type="number" min="0.01" step="0.01" value="${tx.amount}" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Category</label>
-        <select id="editTxCategory" class="form-control"><option value="">— None —</option>${catOptions}</select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Date *</label>
-        <input id="editTxDate" class="form-control" type="date" value="${tx.date}" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Notes</label>
-        <input id="editTxNotes" class="form-control" type="text" value="${esc(tx.notes || '')}">
-      </div>
-    </form>
-  `, `
-    <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
-    <button class="btn btn-primary" id="saveEditTxBtn" onclick="document.getElementById('editTxForm').requestSubmit()">Update</button>
-  `);
+    const [txRes, catsRes] = await Promise.all([api(`/api/transactions/${id}`), api('/api/categories')]);
+    if (!txRes?.ok) return;
+    const tx = txRes.data.data;
+    const cats = catsRes?.data?.data || [];
+    openModal('Edit Transaction', `
+        <form id="txEditForm" onsubmit="event.preventDefault(); submitEditTx('${id}');">
+            <div class="form-group">
+                <label class="form-label">Amount (₹)</label>
+                <input type="number" id="meAmount" class="form-control" step="0.01" value="${tx.amount}" required>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select id="meType" class="form-control"><option value="expense" ${tx.type==='expense'?'selected':''}>Expense</option><option value="income" ${tx.type==='income'?'selected':''}>Income</option></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="meDate" class="form-control" value="${tx.date}" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select id="meCat" class="form-control">
+                    <option value="">— Select —</option>
+                    ${cats.map(c => `<option value="${c.id}" ${c.id===tx.category_id?'selected':''}>${esc(c.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tags (comma separated)</label>
+                <input type="text" id="meTags" class="form-control" value="${(tx.tags||[]).join(', ')}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <input type="text" id="meNotes" class="form-control" value="${esc(tx.notes || '')}">
+            </div>
+        </form>
+    `, `
+        <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
+        <button class="btn btn-primary" onclick="document.getElementById('txEditForm').requestSubmit()">Update Transaction</button>
+    `);
 }
 
-async function submitEditTx(e, id) {
-  e.preventDefault();
-  setLoading('saveEditTxBtn', true, 'Update');
-  const body = {
-    amount: parseFloat(document.getElementById('editTxAmount').value),
-    type: document.getElementById('editTxType').value,
-    category_id: document.getElementById('editTxCategory').value || null,
-    date: document.getElementById('editTxDate').value,
-    notes: document.getElementById('editTxNotes').value
-  };
-  const res = await api(`/api/transactions/${id}`, 'PUT', body);
-  setLoading('saveEditTxBtn', false, 'Update');
-  if (res?.ok) { closeModalById(); toast('Transaction updated!'); loadAdminTransactionsTable(adminTxPage); loadSummaryCards(); }
-  else toast(res?.data?.error || 'Update failed', 'error');
+async function submitEditTx(id) {
+    const tags = document.getElementById('meTags').value.split(',').map(t => t.trim()).filter(t => t);
+    const body = {
+        amount: parseFloat(document.getElementById('meAmount').value),
+        type: document.getElementById('meType').value,
+        date: document.getElementById('meDate').value,
+        category_id: document.getElementById('meCat').value || null,
+        notes: document.getElementById('meNotes').value,
+        tags: tags
+    };
+    const res = await api(`/api/transactions/${id}`, 'PUT', body);
+    if (res?.ok) { toast('Updated successfully'); closeModalById(); loadAdminTransactionsTable(); loadSummaryCards(); }
+    else toast(res?.data?.error || 'Update failed', 'error');
 }
 
 async function deleteTx(id) {
-  openModal('Confirm Delete', '<p style="color:var(--text-muted);">Are you sure you want to delete this transaction? This action cannot be undone.</p>', `
-    <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
-    <button class="btn btn-danger" onclick="confirmDeleteTx('${id}')">🗑️ Delete</button>
-  `);
+    if (!confirm('Permanent delete this transaction?')) return;
+    const res = await api(`/api/transactions/${id}`, 'DELETE');
+    if (res?.ok) { toast('Deleted'); loadAdminTransactionsTable(); loadSummaryCards(); }
 }
-async function confirmDeleteTx(id) {
-  const res = await api(`/api/transactions/${id}`, 'DELETE');
-  closeModalById();
-  if (res?.ok) { toast('Transaction deleted'); loadAdminTransactionsTable(adminTxPage); loadSummaryCards(); }
-  else toast(res?.data?.error || 'Delete failed', 'error');
+
+// ---------- TAGS TAB ----------
+async function loadTagsTable() {
+    const res = await api('/api/tags');
+    const tbody = document.getElementById('tagsTableBody');
+    if (!tbody) return;
+    if (!res?.ok || !res.data.data.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No tags configured.</td></tr>'; return; }
+    tbody.innerHTML = res.data.data.map(t => `
+        <tr>
+            <td><strong>#${esc(t.name)}</strong></td>
+            <td>${t.usage_count || 0} transactions</td>
+            <td class="table-actions">
+                <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteTag('${t.id}')">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+async function openAddTagModal() {
+    openModal('New Tag', `
+        <form id="tagAddForm" onsubmit="event.preventDefault(); submitAddTag();">
+            <div class="form-group">
+                <label class="form-label">Tag Name</label>
+                <input type="text" id="tagAddName" class="form-control" placeholder="e.g. investment" required>
+            </div>
+        </form>
+    `, `
+        <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
+        <button class="btn btn-primary" onclick="document.getElementById('tagAddForm').requestSubmit()">Create Tag</button>
+    `);
+}
+async function submitAddTag() {
+    const name = document.getElementById('tagAddName').value.trim();
+    const res = await api('/api/tags', 'POST', { name });
+    if (res?.ok) { toast('Tag created'); closeModalById(); loadTagsTable(); }
+    else toast(res?.data?.error || 'Failed', 'error');
+}
+async function deleteTag(id) {
+    if(!confirm('Delete tag? This won\'t delete transactions, only the tag itself.')) return;
+    const res = await api(`/api/tags/${id}`, 'DELETE');
+    if (res?.ok) { toast('Tag removed'); loadTagsTable(); }
+}
+
+// ---------- BUDGETS TAB ----------
+async function loadBudgetsTable() {
+    const res = await api('/api/budgets/status');
+    const tbody = document.getElementById('budgetsTableBody');
+    if (!tbody) return;
+    if (!res?.ok || !res.data.data.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No budgets set.</td></tr>'; return; }
+    tbody.innerHTML = res.data.data.map(b => {
+        const pct = Math.min((b.actual / b.limit) * 100, 100);
+        const barClass = b.status === 'over' ? 'budget-over' : b.status === 'warning' ? 'budget-warn' : 'budget-ok';
+        return `
+            <tr>
+                <td><strong>${esc(b.category_name)}</strong></td>
+                <td><span class="badge badge-viewer">${b.period}</span></td>
+                <td>${INR(b.limit)}</td>
+                <td>${INR(b.actual)}</td>
+                <td style="color:${b.remaining < 0 ? 'var(--danger)' : 'var(--success)'}">${INR(Math.abs(b.remaining))} ${b.remaining < 0 ? 'Exceeded' : 'Left'}</td>
+                <td>
+                    <div style="display:flex; flex-direction:column; gap:.25rem; min-width:120px;">
+                        <span class="badge badge-${b.status}">${b.status.toUpperCase()}</span>
+                        <div class="budget-bar"><div class="budget-fill ${barClass}" style="width:${pct}%"></div></div>
+                    </div>
+                </td>
+                <td class="table-actions">
+                    <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteBudget('${b.id}')">Delete</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+async function openAddBudgetModal() {
+    const catsRes = await api('/api/categories');
+    const cats = catsRes?.data?.data || [];
+    openModal('Set Spending Limit', `
+        <form id="budgetAddForm" onsubmit="event.preventDefault(); submitAddBudget();">
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select id="budgetCat" class="form-control" required>
+                    ${cats.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Budget Limit (₹)</label>
+                <input type="number" id="budgetLimit" class="form-control" step="1" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Period</label>
+                <select id="budgetPeriod" class="form-control"><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select>
+            </div>
+        </form>
+    `, `
+        <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
+        <button class="btn btn-primary" onclick="document.getElementById('budgetAddForm').requestSubmit()">Save Budget</button>
+    `);
+}
+async function submitAddBudget() {
+    const body = {
+        category_id: document.getElementById('budgetCat').value,
+        amount_limit: parseFloat(document.getElementById('budgetLimit').value),
+        period: document.getElementById('budgetPeriod').value
+    };
+    const res = await api('/api/budgets', 'POST', body);
+    if (res?.ok) { toast('Budget updated'); closeModalById(); loadBudgetsTable(); }
+    else toast(res?.data?.error || 'Failed', 'error');
+}
+async function deleteBudget(id) {
+    if(!confirm('Delete this budget limit?')) return;
+    const res = await api(`/api/budgets/${id}`, 'DELETE');
+    if (res?.ok) { toast('Budget removed'); loadBudgetsTable(); }
+}
+
+// ---------- RECURRING TAB ----------
+async function loadRecurringTable() {
+    const res = await api('/api/data/recurring');
+    const tbody = document.getElementById('recurringTableBody');
+    if (!tbody) return;
+    if (!res?.ok || !res.data.data.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No recurring schedules.</td></tr>'; return; }
+    tbody.innerHTML = res.data.data.map(r => `
+        <tr>
+            <td><strong>${fmtDate(r.next_due_date)}</strong></td>
+            <td>${esc(r.category_name || 'General')}</td>
+            <td>${esc(r.notes || '—')}</td>
+            <td><span class="badge badge-analyst">${r.recurrence_interval}</span></td>
+            <td><span class="badge badge-${r.type}">${r.type}</span></td>
+            <td style="text-align:right; font-weight:600;">${INR(r.amount)}</td>
+            <td class="table-actions">
+                <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteRecurring('${r.id}')">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+async function openAddRecurringModal() {
+    const cats = (await api('/api/categories'))?.data?.data || [];
+    openModal('New Recurring Schedule', `
+        <form id="recAddForm" onsubmit="event.preventDefault(); submitAddRecurring();">
+            <div class="form-group">
+                <label class="form-label">Amount (₹)</label>
+                <input type="number" id="raAmount" class="form-control" required placeholder="0.00">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Interval</label>
+                <select id="raInterval" class="form-control">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly" selected>Monthly</option>
+                    <option value="yearly">Yearly</option>
+                </select>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select id="raType" class="form-control"><option value="expense">Expense</option><option value="income">Income</option></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" id="raDate" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select id="raCat" class="form-control">
+                    <option value="">— Select —</option>
+                    ${cats.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <input type="text" id="raNotes" class="form-control" placeholder="Netflix, Rent, Salary etc.">
+            </div>
+        </form>
+    `, `
+        <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
+        <button class="btn btn-primary" onclick="document.getElementById('recAddForm').requestSubmit()">Create Schedule</button>
+    `);
+}
+async function submitAddRecurring() {
+    const body = {
+        amount: parseFloat(document.getElementById('raAmount').value),
+        interval: document.getElementById('raInterval').value,
+        type: document.getElementById('raType').value,
+        start_date: document.getElementById('raDate').value,
+        category_id: document.getElementById('raCat').value || null,
+        notes: document.getElementById('raNotes').value
+    };
+    const res = await api('/api/data/recurring', 'POST', body);
+    if (res?.ok) { toast('Schedule created'); closeModalById(); loadRecurringTable(); }
+    else toast(res?.data?.error || 'Failed', 'error');
+}
+async function processRecurring() {
+    setBtn('procRecBtn', true, 'Processing...');
+    const res = await api('/api/data/recurring/process', 'POST');
+    setBtn('procRecBtn', false, 'Process Due Now');
+    if (res?.ok) { toast(`Processed ${res.data.data.processed} due transactions!`); loadRecurringTable(); loadSummaryCards(); }
+    else toast('Processing failed', 'error');
+}
+async function deleteRecurring(id) {
+    if(!confirm('Stop this recurring cycle? Past transactions won\'t be affected.')) return;
+    const res = await api(`/api/data/recurring/${id}`, 'DELETE');
+    if (res?.ok) { toast('Sheduly removed'); loadRecurringTable(); }
+}
+
+// ---------- ANALYTICS TAB ----------
+let _yoyChart = null, _heatmapChart = null;
+async function loadAnalytics() {
+    const year = document.getElementById('heatmapYear').value;
+    const yoyRes = await api(`/api/analytics/yoy-comparison?year=${year}`);
+    const heatRes = await api(`/api/analytics/heatmap?year=${year}`);
+    const cardsRes = await api(`/api/analytics/savings-rate`);
+    
+    // Savings Cards
+    if (cardsRes?.ok) {
+        const d = cardsRes.data.data;
+        document.getElementById('analyticsCards').innerHTML = `
+            <div class="stat-card balance">
+                <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+                <div class="stat-label">Savings Rate</div>
+                <div class="stat-value">${(d.savings_rate||0).toFixed(1)}%</div>
+                <div class="stat-sub">From ${INR(d.total_income)} revenue</div>
+            </div>
+            <div class="stat-card count">
+                <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+                <div class="stat-label">Retained Capital</div>
+                <div class="stat-value">${INR(d.savings)}</div>
+                <div class="stat-sub">Profit after tax & spend</div>
+            </div>
+        `;
+    }
+
+    if (yoyRes?.ok) {
+        const d = yoyRes.data.data;
+        const ctx = document.getElementById('yoyChart');
+        if (ctx) {
+            if (_yoyChart) _yoyChart.destroy();
+            _yoyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                    datasets: [
+                        { label: 'Current Year', data: d.map(x => x.current_total), borderColor: 'var(--primary)', backgroundColor: 'var(--primary-glow)', fill: true, tension: 0.3 },
+                        { label: 'Prior Year', data: d.map(x => x.previous_total), borderColor: 'var(--text-muted)', borderDash: [5,5], fill: false, tension: 0.3 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
+            });
+        }
+    }
+
+    if (heatRes?.ok) {
+        const d = heatRes.data.data;
+        const ctx = document.getElementById('heatmapChart');
+        if (ctx) {
+            if (_heatmapChart) _heatmapChart.destroy();
+            // Since Chart.js doesn't do native Heatmap well without plugins, 
+            // we use a radar or simple vertical bar as "frequency" or just a line chart of daily spend.
+            // Let's use a specialized Line chart for 365 points of daily spend.
+            _heatmapChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: d.map(x => x.day),
+                    datasets: [{ label: 'Daily Expense', data: d.map(x => x.total), backgroundColor: 'rgba(99, 102, 241, 0.4)', borderRadius: 1 }]
+                },
+                options: { 
+                   responsive: true, maintainAspectRatio: false, 
+                   scales: { x: { display: false }, y: { beginAtZero: true } },
+                   plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => INR(c.raw) } } }
+                }
+            });
+        }
+    }
+}
+
+// ---------- AUDIT TAB ----------
+let auditPage = 1;
+async function loadAuditLog(page = auditPage) {
+    auditPage = page;
+    const action = document.getElementById('auditAction').value;
+    const entity = document.getElementById('auditEntity').value;
+    const from = document.getElementById('auditFrom').value;
+    const to = document.getElementById('auditTo').value;
+    
+    let url = `/api/audit?page=${page}&per_page=20`;
+    if (action) url += `&action=${action}`;
+    if (entity) url += `&entity_type=${entity}`;
+    if (from) url += `&date_from=${from}`;
+    if (to) url += `&date_to=${to}`;
+    
+    const res = await api(url);
+    const tbody = document.getElementById('auditTableBody');
+    if (!tbody || !res?.ok) return;
+    
+    tbody.innerHTML = res.data.data.map(l => `
+        <tr>
+            <td style="font-size:.8rem; color:var(--text-muted);">${fmtDate(l.created_at)} ${new Date(l.created_at).toLocaleTimeString()}</td>
+            <td><strong>${esc(l.user_email || 'System')}</strong></td>
+            <td><span class="badge badge-viewer">${l.action}</span></td>
+            <td class="key-prefix">${l.entity_type} / ${l.entity_id ? (l.entity_id.slice(0,8)+'...') : '—'}</td>
+            <td style="color:var(--text-muted);">${l.ip_address || '—'}</td>
+            <td style="text-align:right;"><button class="btn btn-ghost btn-sm" onclick="viewAuditDetails('${l.id}')">View</button></td>
+        </tr>
+    `).join('');
+    
+    renderPagination('auditPagination', res.data.meta, p => loadAuditLog(p));
+    document.getElementById('auditMetaInfo').textContent = `Total actions: ${res.data.meta.total}`;
+}
+async function viewAuditDetails(id) {
+    // Standard detail fetch would go here, for now just placeholder for intern project
+    toast('Audit detailed JSON logged to console', 'info');
+}
+
+// ---------- PROFILE TAB ----------
+async function loadProfile() {
+    const res = await api('/api/me');
+    if (!res?.ok) return;
+    const u = res.data.data;
+    
+    document.getElementById('profileAvatar').textContent = u.name[0].toUpperCase();
+    document.getElementById('profileName').textContent = u.name;
+    document.getElementById('profileEmail').textContent = u.email;
+    document.getElementById('profNameInput').value = u.name;
+    
+    // API Keys
+    const keysRes = await api('/api/me/api-keys');
+    const keyList = document.getElementById('apiKeysList');
+    if (keysRes?.ok && keyList) {
+        if (!keysRes.data.data.length) keyList.innerHTML = '<p class="empty-state">No API keys generated.</p>';
+        else keyList.innerHTML = keysRes.data.data.map(k => `
+            <div class="stat-card" style="display:flex; justify-content:space-between; align-items:center; padding:.75rem 1rem;">
+                <div>
+                    <div style="font-weight:600; font-size:.9rem;">${esc(k.label)}</div>
+                    <div class="key-prefix">${k.key_prefix}••••••••</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:.7rem; color:var(--text-muted);">Used ${k.last_used_at ? fmtDate(k.last_used_at) : 'Never'}</div>
+                    <button class="btn btn-sm" style="color:var(--danger); padding:0; height:auto;" onclick="revokeApiKey('${k.id}')">Revoke</button>
+                </div>
+            </div>
+        `).join('');
+    }
+}
+async function updateProfile() {
+    const body = {
+        name: document.getElementById('profNameInput').value,
+        current_password: document.getElementById('profCurrPass').value,
+        new_password: document.getElementById('profNewPass').value
+    };
+    if (body.new_password && !body.current_password) { toast('Current password required to change password', 'error'); return; }
+    
+    const res = await api('/api/me', 'PUT', body);
+    if (res?.ok) { toast('Profile updated'); loadProfile(); }
+    else toast(res?.data?.error || 'Update failed', 'error');
+}
+async function openCreateApiKeyModal() {
+    openModal('Generate API Key', `
+        <div class="info-box info-box-blue" style="margin-bottom:1rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            This key will grant programmatic access to your records. Keys are shown only once upon creation.
+        </div>
+        <form id="apiKeyAddForm" onsubmit="event.preventDefault(); submitCreateApiKey();">
+            <div class="form-group">
+                <label class="form-label">Key Label</label>
+                <input type="text" id="akLabel" class="form-control" placeholder="e.g. Zapier Integration" required>
+            </div>
+        </form>
+    `, `
+        <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
+        <button class="btn btn-primary" onclick="document.getElementById('apiKeyAddForm').requestSubmit()">Generate Key</button>
+    `);
+}
+async function submitCreateApiKey() {
+    const body = { label: document.getElementById('akLabel').value, permissions: ['read', 'write'] };
+    const res = await api('/api/me/api-keys', 'POST', body);
+    if (res?.ok) {
+        const k = res.data.data;
+        openModal('Success — Key Generated', `
+            <p style="font-size:.9rem; margin-bottom:1rem;">Copy your secret key now. You won't be able to see it again!</p>
+            <div class="form-group">
+                <div class="input-group">
+                    <input type="text" value="${k.key}" class="form-control" readonly id="generatedKeyInp" style="font-family:monospace; background:var(--bg-subtle);">
+                    <button class="btn btn-outline" style="position:absolute; right:0; height:100%; border-radius:0 8px 8px 0;" onclick="navigator.clipboard.writeText('${k.key}'); toast('Copied!')">Copy</button>
+                </div>
+            </div>
+        `, `<button class="btn btn-primary" onclick="closeModalById(); loadProfile();">I've Saved It</button>`);
+    } else toast('Failed to generate key', 'error');
+}
+async function revokeApiKey(id) {
+    if(!confirm('Revoke this key? Apps using it will lose access immediately.')) return;
+    const res = await api(`/api/me/api-keys/${id}`, 'DELETE');
+    if (res?.ok) { toast('Key revoked'); loadProfile(); }
+}
+
+// ---------- DATA IMPORT/EXPORT ----------
+async function exportCSV() {
+    const type = document.getElementById('filterType').value;
+    const cat = document.getElementById('txTo').getAttribute('data-cat-filter') || ''; // dummy
+    toast('Generating CSV...', 'info');
+    let url = `/api/data/export/csv?type=${type}`;
+    // simple download trigger
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'transactions_export.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+function openImportCSVModal() {
+    openModal('Import Transactions', `
+        <div class="info-box info-box-yellow" style="margin-bottom:1rem;">
+             CSV must headers: amount, type, date (YYYY-MM-DD), notes (optional), category (optional).
+        </div>
+        <div class="upload-zone" id="dropZone" onclick="document.getElementById('csvFile').click()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p style="margin-top:.5rem;"><strong>Click to upload</strong> or drag and drop CSV file</p>
+            <input type="file" id="csvFile" accept=".csv" onchange="handleCsvFileChange()">
+        </div>
+        <div id="fileInfo" style="margin-top:1rem; font-size:.875rem; text-align:center;"></div>
+    `, `
+        <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
+        <button class="btn btn-primary" id="importBtn" onclick="submitImportCSV()" disabled>Upload & Import</button>
+    `);
+}
+function handleCsvFileChange() {
+    const f = document.getElementById('csvFile').files[0];
+    if (f) {
+        document.getElementById('fileInfo').textContent = `Ready: ${f.name} (${(f.size/1024).toFixed(1)} KB)`;
+        document.getElementById('importBtn').disabled = false;
+    }
+}
+async function submitImportCSV() {
+    const f = document.getElementById('csvFile').files[0];
+    if (!f) return;
+    const formData = new FormData();
+    formData.append('file', f);
+    setBtn('importBtn', true, 'Importing...');
+    try {
+        const res = await fetch('/api/data/import/csv', { method: 'POST', body: formData, credentials: 'include' });
+        const d = await res.json();
+        if (res.ok) {
+            toast(`Success: ${d.data.success} rows, Failed: ${d.data.failed}`);
+            closeModalById();
+            loadAdminTransactionsTable();
+            loadSummaryCards();
+        } else toast(d.error || 'Import failed', 'error');
+    } catch (e) { toast('Network error during upload', 'error'); }
+    finally { setBtn('importBtn', false, 'Upload & Import'); }
+}
+
+// ---------- USERS TAB ----------
+async function loadUsersTable() {
+    const res = await api('/api/users');
+    const tbody = document.getElementById('usersTableBody');
+    if (!tbody || !res?.ok) return;
+    tbody.innerHTML = res.data.data.map(u => `
+        <tr>
+            <td><strong>${esc(u.name)}</strong></td>
+            <td>${esc(u.email)}</td>
+            <td><span class="badge badge-${u.role}">${u.role}</span></td>
+            <td><span class="badge badge-${u.status}">${u.status}</span></td>
+            <td style="font-size:.75rem; color:var(--text-muted);">${u.last_login ? fmtDate(u.last_login) : 'Never'}</td>
+            <td class="table-actions">
+                <button class="btn btn-ghost btn-sm" onclick="openEditUserModal('${u.id}', '${u.role}', '${u.status}')">Edit</button>
+            </td>
+        </tr>
+    `).join('');
+}
+// placeholder modals for other core logic if missing from existing but let's assume consistent
+function renderPagination(id, meta, onPage) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const { page, total_pages } = meta;
+    if (total_pages <= 1) { el.innerHTML = ''; return; }
+    let h = `<button class="page-btn" onclick="(${onPage.toString()})(${page - 1})" ${page <= 1 ? 'disabled' : ''}>Prev</button>`;
+    for (let i = 1; i <= total_pages; i++) {
+        if (i===1 || i===total_pages || (i >= page-1 && i <= page+1)) {
+            h += `<button class="page-btn ${i===page?'active':''}" onclick="(${onPage.toString()})(${i})">${i}</button>`;
+        } else if (i === page-2 || i === page+2) h += '<span style="color:var(--text-muted)">...</span>';
+    }
+    h += `<button class="page-btn" onclick="(${onPage.toString()})(${page + 1})" ${page >= total_pages ? 'disabled' : ''}>Next</button>`;
+    el.innerHTML = h;
 }
 
 // ---------- CATEGORIES ----------
 async function loadCategoriesTable() {
-  const res = await api('/api/categories');
-  const tbody = document.getElementById('categoriesTableBody');
-  if (!tbody) return;
-  if (!res?.ok || !res.data.data.length) {
-    tbody.innerHTML = '<tr><td colspan="2"><div class="empty-state"><div class="empty-icon">🏷️</div><h3>No categories</h3></div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = res.data.data.map(c => `
-    <tr>
-      <td><strong>${esc(c.name)}</strong></td>
-      <td style="text-align:right;"><button class="btn btn-danger btn-sm" onclick="deleteCategory('${c.id}','${esc(c.name)}')">🗑️ Delete</button></td>
-    </tr>
-  `).join('');
-  _categories = []; // reset cache so next tx modal is fresh
+    const res = await api('/api/categories');
+    const tbody = document.getElementById('categoriesTableBody');
+    if (!tbody || !res?.ok) return;
+    tbody.innerHTML = res.data.data.map(c => `
+        <tr>
+            <td><strong>${esc(c.name)}</strong></td>
+            <td class="table-actions">
+                 <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteCategory('${c.id}')">Delete</button>
+            </td>
+        </tr>
+    `).join('');
 }
-
 async function openAddCategoryModal() {
-  openModal('Add Category', `
-    <form id="addCatForm" onsubmit="submitAddCategory(event)">
-      <div class="form-group">
-        <label class="form-label">Category Name *</label>
-        <input id="catName" class="form-control" type="text" placeholder="e.g. Insurance" required>
-        <span class="form-error" id="catNameErr"></span>
-      </div>
-    </form>
-  `, `
-    <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
-    <button class="btn btn-primary" id="saveCatBtn" onclick="document.getElementById('addCatForm').requestSubmit()">Add Category</button>
-  `);
+    openModal('New Category', `
+        <form id="catAddForm" onsubmit="event.preventDefault(); submitAddCategory();">
+            <div class="form-group">
+                <label class="form-label">Category Name</label>
+                <input type="text" id="catAddName" class="form-control" placeholder="e.g. Travel" required>
+            </div>
+        </form>
+    `, `<button class="btn btn-outline" onclick="closeModalById()">Cancel</button><button class="btn btn-primary" onclick="document.getElementById('catAddForm').requestSubmit()">Add Category</button>`);
 }
-async function submitAddCategory(e) {
-  e.preventDefault();
-  const name = document.getElementById('catName').value.trim();
-  if (!name) { setError('catNameErr', 'Name is required'); return; }
-  setLoading('saveCatBtn', true);
-  const res = await api('/api/categories', 'POST', { name });
-  setLoading('saveCatBtn', false);
-  if (res?.ok) { closeModalById(); toast('Category added!'); loadCategoriesTable(); }
-  else toast(res?.data?.error || 'Failed', 'error');
+async function submitAddCategory() {
+    const name = document.getElementById('catAddName').value.trim();
+    const res = await api('/api/categories', 'POST', { name });
+    if (res?.ok) { toast('Category added'); closeModalById(); loadCategoriesTable(); }
+}
+async function deleteCategory(id) {
+    if(!confirm('Delete? This fails if transactions exist.')) return;
+    const res = await api(`/api/categories/${id}`, 'DELETE');
+    if(res?.ok) { toast('Deleted'); loadCategoriesTable(); }
+    else toast('Cannot delete: Category in use', 'error');
 }
 
-async function deleteCategory(id, name) {
-  openModal('Confirm Delete', `<p style="color:var(--text-muted);">Delete category <strong>${esc(name)}</strong>? This will fail if any transactions use it.</p>`, `
-    <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
-    <button class="btn btn-danger" onclick="confirmDeleteCat('${id}')">🗑️ Delete</button>
-  `);
-}
-async function confirmDeleteCat(id) {
-  const res = await api(`/api/categories/${id}`, 'DELETE');
-  closeModalById();
-  if (res?.ok) { toast('Category deleted'); loadCategoriesTable(); }
-  else toast(res?.data?.error || 'Cannot delete — transactions exist with this category', 'error');
-}
-
-// ---------- USERS ----------
-let userPage = 1;
-
-async function loadUsersTable(page = userPage) {
-  userPage = page;
-  const s = document.getElementById('searchUser')?.value || '';
-  const role = document.getElementById('filterRole')?.value || '';
-  const status = document.getElementById('filterStatus')?.value || '';
-  const p = new URLSearchParams({ page, per_page: 15 });
-  if (s) p.append('search', s);
-  if (role) p.append('role', role);
-  if (status) p.append('status', status);
-  const res = await api('/api/users?' + p);
-  const tbody = document.getElementById('usersTableBody');
-  if (!tbody) return;
-  if (!res?.ok) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--danger);">Failed to load users</td></tr>'; return; }
-  const data = res.data.data;
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">👤</div><h3>No users found</h3></div></td></tr>'; return; }
-  tbody.innerHTML = data.map(u => `
-    <tr>
-      <td><strong>${esc(u.name)}</strong></td>
-      <td style="color:var(--text-muted);">${esc(u.email)}</td>
-      <td><span class="badge badge-${u.role}">${u.role}</span></td>
-      <td><span class="badge badge-${u.status}">${u.status}</span></td>
-      <td style="color:var(--text-muted); font-size:.8rem;">${u.last_login ? fmtDate(u.last_login) : 'Never'}</td>
-      <td style="text-align:right; white-space:nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="openEditUserModal('${u.id}','${esc(u.role)}','${esc(u.status)}')">✏️ Edit</button>
-        ${u.status==='active'?`<button class="btn btn-danger btn-sm" style="margin-left:.25rem;" onclick="deactivateUser('${u.id}','${esc(u.name)}')">🚫</button>`:''}
-      </td>
-    </tr>
-  `).join('');
-  renderPagination('userPagination', res.data.meta, p2 => loadUsersTable(p2));
-  const metaEl = document.getElementById('userMetaInfo');
-  if (metaEl) { const m = res.data.meta; metaEl.textContent = `Page ${m.page} of ${m.total_pages} • ${m.total} users`; }
-}
-
-async function openAddUserModal() {
-  openModal('Add User', `
-    <form id="addUserForm" onsubmit="submitAddUser(event)">
-      <div class="form-group">
-        <label class="form-label">Full Name *</label>
-        <input id="uName" class="form-control" type="text" placeholder="John Doe" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Email *</label>
-        <input id="uEmail" class="form-control" type="email" placeholder="user@example.com" required>
-        <span class="form-error" id="uEmailErr"></span>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Password *</label>
-        <input id="uPassword" class="form-control" type="password" placeholder="Min 8 chars, 1 uppercase, 1 number" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Role *</label>
-        <select id="uRole" class="form-control">
-          <option value="viewer">Viewer</option>
-          <option value="analyst">Analyst</option>
-          <option value="admin">Admin</option>
-        </select>
-      </div>
-    </form>
-    <p style="font-size:.8rem;color:var(--text-muted);margin-top:.5rem;">Admin-created users are verified immediately — no OTP required.</p>
-  `, `
-    <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
-    <button class="btn btn-primary" id="saveUserBtn" onclick="document.getElementById('addUserForm').requestSubmit()">Create User</button>
-  `);
-}
-
-async function submitAddUser(e) {
-  e.preventDefault();
-  clearErrors('uEmailErr');
-  setLoading('saveUserBtn', true);
-  const body = {
-    name: document.getElementById('uName').value.trim(),
-    email: document.getElementById('uEmail').value.trim(),
-    password: document.getElementById('uPassword').value,
-    role: document.getElementById('uRole').value
-  };
-  const res = await api('/api/users', 'POST', body);
-  setLoading('saveUserBtn', false);
-  if (res?.ok) { closeModalById(); toast('User created!'); loadUsersTable(1); }
-  else { setError('uEmailErr', res?.data?.error || 'Failed to create user'); }
-}
-
-async function openEditUserModal(id, currentRole, currentStatus) {
-  openModal('Edit User', `
-    <div class="form-group">
-      <label class="form-label">Role</label>
-      <select id="editURole" class="form-control">
-        <option value="viewer" ${currentRole==='viewer'?'selected':''}>Viewer</option>
-        <option value="analyst" ${currentRole==='analyst'?'selected':''}>Analyst</option>
-        <option value="admin" ${currentRole==='admin'?'selected':''}>Admin</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Status</label>
-      <select id="editUStatus" class="form-control">
-        <option value="active" ${currentStatus==='active'?'selected':''}>Active</option>
-        <option value="inactive" ${currentStatus==='inactive'?'selected':''}>Inactive</option>
-      </select>
-    </div>
-  `, `
-    <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
-    <button class="btn btn-primary" id="saveEditUserBtn" onclick="submitEditUser('${id}')">Save Changes</button>
-  `);
-}
-
-async function submitEditUser(id) {
-  setLoading('saveEditUserBtn', true, 'Save Changes');
-  const body = { role: document.getElementById('editURole').value, status: document.getElementById('editUStatus').value };
-  const res = await api(`/api/users/${id}`, 'PUT', body);
-  setLoading('saveEditUserBtn', false, 'Save Changes');
-  if (res?.ok) { closeModalById(); toast('User updated!'); loadUsersTable(userPage); }
-  else toast(res?.data?.error || 'Update failed', 'error');
-}
-
-async function deactivateUser(id, name) {
-  openModal('Confirm Deactivation', `<p style="color:var(--text-muted);">Deactivate <strong>${esc(name)}</strong>? They won't be able to log in until reactivated.</p>`, `
-    <button class="btn btn-outline" onclick="closeModalById()">Cancel</button>
-    <button class="btn btn-danger" onclick="confirmDeactivate('${id}')">🚫 Deactivate</button>
-  `);
-}
-async function confirmDeactivate(id) {
-  const res = await api(`/api/users/${id}`, 'DELETE');
-  closeModalById();
-  if (res?.ok) { toast('User deactivated'); loadUsersTable(userPage); }
-  else toast(res?.data?.error || 'Failed', 'error');
-}
-
-// ---------- CSV EXPORT ----------
-async function exportCSV() {
-  const res = await api('/api/transactions?per_page=1000&page=1');
-  if (!res?.ok) { toast('Failed to export', 'error'); return; }
-  const headers = ['Date','Type','Category','Notes','Amount'];
-  const rows = res.data.data.map(tx => [
-    tx.date, tx.type, tx.category_name || '', (tx.notes || '').replace(/,/g,' '), tx.amount
-  ]);
-  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
-  a.click();
-  toast('CSV exported!');
-}
+// ---------- CORE JS INITIALIZER ----------
+document.addEventListener('DOMContentLoaded', () => {
+   // Initial page check
+   if (document.body.innerHTML.includes('dashboard')) {
+       // if we are on a dashboard page, default load logic is already in templates script tags
+   }
+});

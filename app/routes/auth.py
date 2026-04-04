@@ -44,14 +44,13 @@ def login():
     if status != 200:
         return error(resp['error'], status)
         
-    # Setup HTTP-Only Cookie — use Secure=False in dev (localhost is not HTTPS)
     response = make_response(success(message=resp['message'], data=resp.get('data'), status=status))
     response.set_cookie(
         'token', 
         resp['data']['token'], 
         httponly=True, 
-        secure=False,       # False for localhost (no HTTPS)
-        samesite='Lax',     # Lax works better than Strict for local redirects
+        secure=False,
+        samesite='Lax',
         max_age=24*3600
     )
     return response
@@ -80,6 +79,10 @@ def reset_password():
 @auth_bp.route('/logout', methods=['POST'])
 @token_required
 def logout():
-    response = make_response(success(message="Logged out."))
+    # Blacklist the token
+    token = request.cookies.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    AuthService.logout(token)
+    
+    response = make_response(success(message="Logged out successfully."))
     response.set_cookie('token', '', expires=0, httponly=True, secure=False, samesite='Lax')
     return response

@@ -41,9 +41,12 @@ def create_transaction():
     if not data or not data.get('amount') or not data.get('type') or not data.get('date'):
         return error("Amount, type, and date are required.", 400)
     
-    amount = float(data['amount'])
-    if amount <= 0:
-        return error("Amount must be positive.", 400)
+    try:
+        amount = float(data['amount'])
+        if amount <= 0:
+            return error("Amount must be positive.", 400)
+    except (ValueError, TypeError):
+        return error("Amount must be a number.", 400)
         
     if data['type'] not in ['income', 'expense']:
         return error("Type must be 'income' or 'expense'.", 400)
@@ -54,9 +57,13 @@ def create_transaction():
     if data.get('category_id') and not is_valid_uuid(data['category_id']):
          return error("Invalid category ID format", 400)
 
+    tags = data.get('tags', [])
+    if not isinstance(tags, list):
+        return error("Tags must be a list of strings.", 400)
+
     tx = TransactionService.create_transaction(
         amount, data['type'], data.get('category_id'), data['date'], 
-        data.get('notes'), request.current_user['user_id']
+        data.get('notes'), request.current_user['user_id'], tags=tags
     )
     return success(data=tx, status=201)
 
@@ -67,8 +74,9 @@ def update_transaction(tx_id):
         return error("Invalid transaction ID", 400)
         
     data = request.get_json()
+    if not data:
+        return error("Missing data.", 400)
     
-    # Needs validation for existing TX logic checking
     valid_tx = TransactionService.get_transaction(tx_id)
     if not valid_tx:
         return error("Transaction not found", 404)
@@ -78,14 +86,26 @@ def update_transaction(tx_id):
     category_id = data.get('category_id', valid_tx['category_id'])
     date = data.get('date', valid_tx['date'])
     notes = data.get('notes', valid_tx['notes'])
+    tags = data.get('tags') # may be None to skip update
     
-    if data.get('amount') and float(data.get('amount')) <= 0:
-         return error("Amount must be positive.", 400)
+    if data.get('amount'):
+        try:
+            amount = float(data['amount'])
+            if amount <= 0:
+                return error("Amount must be positive.", 400)
+        except (ValueError, TypeError):
+             return error("Amount must be a number.", 400)
          
     if data.get('type') and data.get('type') not in ['income', 'expense']:
          return error("Type must be 'income' or 'expense'.", 400)
 
-    tx = TransactionService.update_transaction(tx_id, amount, tx_type, category_id, date, notes)
+    if tags is not None and not isinstance(tags, list):
+        return error("Tags must be a list of strings.", 400)
+
+    tx = TransactionService.update_transaction(
+        tx_id, amount, tx_type, category_id, date, notes, 
+        request.current_user['user_id'], tags=tags
+    )
     if not tx:
          return error("Transaction not found during update", 400)
          

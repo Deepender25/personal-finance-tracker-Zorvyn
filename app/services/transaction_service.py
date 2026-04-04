@@ -9,9 +9,12 @@ class TransactionService:
         
         query = """
             SELECT t.id, t.amount, t.type, t.date, t.notes, t.category_id, 
-                   c.name as category_name, t.created_at, t.updated_at
+                   c.name as category_name, t.created_at, t.updated_at,
+                   ARRAY_REMOVE(ARRAY_AGG(tg.name), NULL) as tags
             FROM transactions t
             LEFT JOIN categories c ON t.category_id = c.id
+            LEFT JOIN transaction_tags tt ON t.id = tt.transaction_id
+            LEFT JOIN tags tg ON tt.tag_id = tg.id
             WHERE t.is_deleted = false
         """
         params = []
@@ -36,19 +39,24 @@ class TransactionService:
             query += " AND (t.notes ILIKE %s)"
             params.append(f"%{search}%")
             
-        # Count total
+        query += " GROUP BY t.id, c.name"
+        
+        # Count total (use subquery for count because of group by)
         count_query = f"SELECT COUNT(*) FROM ({query}) AS count_tbl"
         
         with get_db_cursor() as cursor:
             cursor.execute(count_query, params)
             total = cursor.fetchone()[0]
             
-            # Fetch pginated data
+            # Fetch paginated data
             query += " ORDER BY t.date DESC, t.created_at DESC LIMIT %s OFFSET %s"
             params.extend([per_page, offset])
             
             cursor.execute(query, params)
             data = [dict(row) for row in cursor.fetchall()]
+            for item in data:
+                item['id'] = str(item['id'])
+                item['amount'] = float(item['amount'])
             
         return {
             "data": data,
@@ -64,16 +72,25 @@ class TransactionService:
     def get_transaction(tx_id):
         with get_db_cursor() as cursor:
             cursor.execute("""
-                SELECT t.id, t.amount, t.type, t.date, t.notes, t.category_id, c.name as category_name
+                SELECT t.id, t.amount, t.type, t.date, t.notes, t.category_id, c.name as category_name,
+                       ARRAY_REMOVE(ARRAY_AGG(tg.name), NULL) as tags
                 FROM transactions t
                 LEFT JOIN categories c ON t.category_id = c.id
+                LEFT JOIN transaction_tags tt ON t.id = tt.transaction_id
+                LEFT JOIN tags tg ON tt.tag_id = tg.id
                 WHERE t.id = %s AND t.is_deleted = false
+                GROUP BY t.id, c.name
             """, (tx_id,))
             record = cursor.fetchone()
-            return dict(record) if record else None
+            if record:
+                res = dict(record)
+                res['id'] = str(res['id'])
+                res['amount'] = float(res['amount'])
+                return res
+            return None
 
     @staticmethod
-    def create_transaction(amount, tx_type, category_id, date, notes, user_id):
+    def create_transaction(amount, tx_type, category_id, date, notes, user_id, tags=None):
         with get_db_cursor(commit=True) as cursor:
             cursor.execute("""
                 INSERT INTO transactions (amount, type, category_id, date, notes, created_by)
@@ -81,11 +98,27 @@ class TransactionService:
                 RETURNING id, amount, type, date, notes, category_id, created_at, updated_at
             """, (amount, tx_type, category_id, date, notes, user_id))
             record = dict(cursor.fetchone())
+            tx_id = record['id']
+            record['id'] = str(tx_id)
+            record['amount'] = float(record['amount'])
+
+            # Handle tags
+            if tags and isinstance(tags, list):
+                from app.services.tag_service import TagService
+                for tag_name in tags:
+                    tag, _ = TagService.create_tag(tag_name, user_id)
+                    cursor.execute(
+                        "INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                        (tx_id, tag['id'])
+                    )
+                record['tags'] = tags
+            else:
+                record['tags'] = []
             
         return record
 
     @staticmethod
-    def update_transaction(tx_id, amount, tx_type, category_id, date, notes):
+    def update_transaction(tx_id, amount, tx_type, category_id, date, notes, user_id, tags=None):
         with get_db_cursor(commit=True) as cursor:
             cursor.execute("""
                 UPDATE transactions
@@ -93,9 +126,28 @@ class TransactionService:
                 WHERE id = %s AND is_deleted = false
                 RETURNING id, amount, type, date, notes, category_id, created_at, updated_at
             """, (amount, tx_type, category_id, date, notes, tx_id))
-            record = cursor.fetchone()
+            row = cursor.fetchone()
+            if not row:
+                return None
             
-        return dict(record) if record else None
+            record = dict(row)
+            record['id'] = str(tx_id)
+            record['amount'] = float(record['amount'])
+
+            if tags is not None and isinstance(tags, list):
+                # Remove old tags
+                cursor.execute("DELETE FROM transaction_tags WHERE transaction_id = %s", (tx_id,))
+                # Add new tags
+                from app.services.tag_service import TagService
+                for tag_name in tags:
+                    tag, _ = TagService.create_tag(tag_name, user_id)
+                    cursor.execute(
+                        "INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                        (tx_id, tag['id'])
+                    )
+                record['tags'] = tags
+            
+        return record
 
     @staticmethod
     def delete_transaction(tx_id):

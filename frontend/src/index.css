@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-background: #000000;
+  --color-surface: #131313;
+  --color-surface-hover: #1a1a1a;
+  --color-border-subtle: #262626;
+  --color-border-strong: #404040;
+  --color-primary: #ffffff;
+  --color-muted: #a3a3a3;
+  
+  --color-success: #22c55e;
+  --color-success-bg: rgba(34, 197, 94, 0.1);
+  --color-danger: #ef4444;
+  --color-danger-bg: rgba(239, 68, 68, 0.1);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-primary font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .bento-glow {
+    background: linear-gradient(180deg, #131313 0%, #0f0f0f 100%);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+  .bento-glow:hover {
+    border-color: var(--color-border-strong);
+    box-shadow: 0 10px 20px -3px rgba(0,0,0,0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  }
+  .bento-glow-active {
+    background: linear-gradient(180deg, #1a1a1a 0%, #131313 100%);
+    border-color: var(--color-border-strong);
+    box-shadow: 0 10px 25px -3px rgba(0,0,0,0.9), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  }
+  
+  .text-glow {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  }
+  
+  .glass-panel {
+    @apply bg-surface/80 backdrop-blur-md border border-border-subtle;
+  }
+  
+  /* Custom Scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #000000;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #262626;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #404040;
+  }
+}

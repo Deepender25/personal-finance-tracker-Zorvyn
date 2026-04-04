@@ -1,3 +1,5 @@
+# Rewrite views.js entirely using `views.py`! Oh wait, `views.py` doesn't need to change. 
+# Double checking `app/routes/views.py`: 
 from flask import Blueprint, render_template, redirect, request
 import jwt
 from app.config import Config
@@ -54,6 +56,7 @@ def analyst_dashboard():
 @views_bp.route('/dashboard/admin')
 def admin_dashboard():
     user = get_current_user()
+    error_msg = None
     if not user or user['role'] != 'admin':
         return redirect('/login')
     return render_template('admin/dashboard.html', user=user)
