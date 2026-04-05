@@ -14,8 +14,10 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     if (response.status === 401 && !url.includes('/auth/login') && !url.includes('/auth/logout')) {
-      // Handle unauthorized across the app
-      window.location.href = '/login';
+      // Handle unauthorized across the app, but ensure we don't infinitely reload if already on login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     throw new Error(data?.error || data?.message || 'Something went wrong');
   }

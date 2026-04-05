@@ -1,0 +1,7 @@
+{
+  "name": "finance_dashboard",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build && cd .. && rm -rf public && mkdir public && cp -r frontend/dist/* public/"
+  }
+}
