@@ -18,17 +18,10 @@
       "src": "/api/(.*)",
       "dest": "/api/index.py"
     },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/frontend/dist/assets/$1"
-    },
-    {
-      "src": "/vite.svg",
-      "dest": "/frontend/dist/vite.svg"
-    },
+    { "handle": "filesystem" },
     {
       "src": "/(.*)",
-      "dest": "/frontend/dist/index.html"
+      "dest": "/index.html"
     }
   ]
 }
