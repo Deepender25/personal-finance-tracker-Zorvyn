@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, request, make_response
 from app.services.auth_service import AuthService
 from app.utils.response import success, error
@@ -49,7 +50,7 @@ def login():
         'token', 
         resp['data']['token'], 
         httponly=True, 
-        secure=False,
+        secure=os.environ.get('VERCEL') == '1',
         samesite='Lax',
         max_age=24*3600
     )
@@ -84,5 +85,5 @@ def logout():
     AuthService.logout(token)
     
     response = make_response(success(message="Logged out successfully."))
-    response.set_cookie('token', '', expires=0, httponly=True, secure=False, samesite='Lax')
+    response.set_cookie('token', '', expires=0, httponly=True, secure=os.environ.get('VERCEL') == '1', samesite='Lax')
     return response
