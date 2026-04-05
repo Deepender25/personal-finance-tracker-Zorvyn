@@ -1,75 +1,151 @@
-# FinanceDash — Enterprise Finance Data & Access Control
+<div align="center">
+  <h1>🚀 FinanceDash</h1>
+  <p><strong>Enterprise-Grade Financial Dashboard & Access Control System</strong></p>
+  <p><em>Developed for the Zorvyn Backend Developer Intern Assessment</em></p>
+  
+  <p>
+    <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
+    <img src="https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white" alt="Flask" />
+    <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
+    <img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+    <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind" />
+  </p>
+</div>
 
-A high-performance, secure, and intuitive Finance Management Platform built for entry-level backend architectural excellence. This project demonstrates robust Role-Based Access Control (RBAC), real-time financial analytics, automated recurring transactions, and a professional, emoji-free user interface using modern SVG iconography.
+## 📌 Project Overview
 
-## 🚀 Key Features
+FinanceDash is a full-stack, high-performance financial management platform architected to demonstrate backend proficiency, clean code structuring, and modern API standards. Built as an assessment project, it emphasizes robust security, scalable code organization, and intuitive UI integration.
 
-### 🔐 Security & Access Control
-- **Advanced RBAC**: Granular permissions for `Admin`, `Analyst`, and `Viewer` roles.
-- **JWT Authentication**: Secure session management with industry-standard token-based auth.
-- **Token Blacklisting**: Real-time token invalidation on logout to prevent replay attacks.
-- **API Key Management**: Self-service generation of API keys for programmatic access.
-- **Audit Logging**: Comprehensive, non-blocking background logging of all critical system actions.
-
-### 📊 Financial Intelligence
-- **Real-time Analytics**: Yearly trends, Year-over-Year (YoY) comparisons, and category-wise breakdowns.
-- **Savings Rate Tracking**: Automatic calculation of savings percentage and retained capital.
-- **Expense Heatmaps**: Visual frequency tracking of daily spending patterns.
-- **Budgeting Engine**: Category-specific spending limits with automated status alerts (OK / Warning / Over).
-
-### ⚙️ Automation & Data Management
-- **Recurring Transactions**: Flexible scheduling (Daily, Weekly, Monthly, Yearly) with automated "Due Now" processing.
-- **Many-to-Many Tagging**: Advanced transaction labeling system with auto-tag creation and usage tracking.
-- **CSV Bulk Import**: Drag-and-drop CSV processing for historical data migration.
-- **CSV Export**: Filtered data extraction for external spreadsheet analysis.
-
-## 🛠️ Tech Stack
-- **Backend**: Python 3.x, Flask (RESTful Architecture)
-- **Database**: PostgreSQL (Supabase) with `psycopg2`
-- **Security**: `PyJWT`, `bcrypt`, `Flask-Limiter`
-- **Frontend**: Vanilla JS (ES6+), HTML5, CSS3 (Custom Design System), `Chart.js`
-- **Testing**: `pytest`, `pytest-flask`
-
-## 📦 Installation & Setup
-
-1. **Environment Configuration**:
-   Create a `.env` file from the example and provide your credentials:
-   - `DATABASE_URL`: Your PostgreSQL connection string.
-   - `JWT_SECRET_KEY`: A secure random string.
-   - `GMAIL_ADDRESS` & `GMAIL_APP_PASSWORD`: For OTP verification emails.
-
-2. **Initialize Database**:
-   Run the migration tool to apply the latest enterprise schema:
-   ```bash
-   python scripts/migrate.py
-   ```
-
-3. **Install Dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Launch Application**:
-   ```bash
-   python run.py
-   ```
-   Access the dashboard at `http://localhost:5000`.
-
-## 🧪 Testing
-The project includes a comprehensive suite to ensure reliability. You can run tests directly:
-```bash
-pytest
-```
-*Note: If you encounter import errors, use `python -m pytest` instead.*
-
-## 📂 Project Structure
-- `app/services`: Core business logic and database abstractions.
-- `app/routes`: RESTful API endpoints organized by domain.
-- `app/middleware`: Security filters, RBAC, and Auth validation.
-- `app/templates`: Role-specific dashboard layouts and professional UI.
-- `static/js`: Interactive dashboard logic and charting.
-- `migrations`: Version-controlled SQL schema updates.
-- `scripts`: Maintenance and migration utilities.
+The application features a **Flask RESTful API** backend fortified with **JWT authentication** and granular **Role-Based Access Control (RBAC)**, seamlessly integrated with a modern **React 19 / Vite** frontend heavily customized with **Tailwind CSS** and **Framer Motion**.
 
 ---
-*Developed for the Zorvyn Backend Developer Intern Project.*
+
+## 🏗️ Architecture & Tech Stack
+
+### Backend (API & Core Logic)
+- **Framework:** Python Flask (RESTful routing)
+- **Database:** PostgreSQL (leveraging Supabase) interfaced via `psycopg2`
+- **Security & Auth:** `PyJWT` (Token blacklisting & auth), `bcrypt` (password hashing), `Flask-Limiter` (Rate limiting)
+- **Architecture:** Layered design (Routing -> Controllers/Middlewares -> Services -> Database)
+
+### Frontend (User Interface)
+- **Core:** React 19, TypeScript, Vite
+- **Styling:** Tailwind CSS V4 for a premium, responsive layout
+- **Visualization & Animation:** Recharts for data analytics, Framer Motion for micro-interactions and smooth page transitions
+- **Icons:** Lucide React
+
+---
+
+## ✨ Key Technical Achievements
+
+1. **Robust Authentication & RBAC Hierarchy**
+   - Implemented secure JWT-based authentication with stateless session verification.
+   - Designed 3 distinct roles: `Admin`, `Analyst`, and `Viewer`, each with precisely mapped API permissions.
+   - Built an active token blacklisting mechanism on logout to mitigate replay attacks.
+
+2. **Clean Backend Architecture**
+   - Separated business logic from route presentation.
+   - Designed modular security middlewares that wrap routes dynamically based on required permission tiers.
+   - Integrated robust cross-origin resource sharing (CORS) handling and environment management.
+
+3. **High-Performance Analytics API**
+   - Developed aggregation endpoints delivering ready-to-chart JSON payloads for Year-over-Year tracking, categorical breakdowns, and savings rate computations.
+   - Structured JSON API to minimize client-side processing overloads.
+
+4. **Modern UI/UX Implementation**
+   - Transformed legacy HTML/Jinja interface to a decoupled React Single Page Application (SPA).
+   - Implemented a "Bento-grid" dark mode design prioritizing aesthetics and layout efficiency.
+   - Centralized API request logic with custom hooks and interceptors.
+
+---
+
+## 🛠️ Installation & Local Setup
+
+### Prerequisites
+- Node.js (v18+)
+- Python 3.9+ 
+- PostgreSQL Database URL (e.g., Supabase)
+
+### 1. Clone & Environment Configuration
+
+Clone the repository and jump into the project folder:
+
+```bash
+git clone <repository_url>
+cd finance_dashboard
+```
+
+Create a `.env` file in the root directory (refer to `.env.example`):
+```ini
+DATABASE_URL="your-postgres-connection-string"
+JWT_SECRET_KEY="your-secure-secret-key"
+```
+
+### 2. Backend Setup
+Activate your environment and install dependencies:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Initialize the database schema:
+```bash
+python scripts/migrate.py
+```
+
+### 3. Frontend Setup
+```bash
+cd frontend
+npm install
+```
+
+### 4. Running the Application
+We've included an automated script for Windows (`start.bat`) to launch both services simultaneously securely.
+If running manually:
+
+**Terminal 1 (Backend - Port 5000):**
+```bash
+# In the root 'finance_dashboard' directory
+python run.py
+```
+
+**Terminal 2 (Frontend - Port 3000):**
+```bash
+# In the 'frontend' directory
+npm run dev
+```
+
+Navigate to `http://localhost:3000` to access the dashboard.
+
+---
+
+## 📂 Repository Structure
+
+```text
+finance_dashboard/
+├── app/                  # Backend application core
+│   ├── middleware/       # Auth & RBAC security filters
+│   ├── routes/           # REST API endpoints
+│   └── services/         # Database and core business logic
+├── frontend/             # React 19 / Vite SPA
+│   ├── src/
+│   │   ├── components/   # Reusable UI widgets
+│   │   ├── pages/        # Dashboard layout views
+│   │   └── lib/          # API utilities and configuration
+├── migrations/           # Database schema files
+├── scripts/              # Validation and maintenance utilities
+└── tests/                # Pytest testing suite
+```
+
+---
+
+## 🎯 Assessment Focus Areas Addressed
+This submission directly highlights capabilities in:
+- Building clean, maintainable, and scalable Python API systems.
+- Designing strict Access Control flows and securing endpoints against unauthorized behaviors.
+- Working independently with full-stack requirements and adapting modern React tooling.
+- Maintaining disciplined project structuring, documentation, and module separation.
+
+---
+*Thank you for reviewing my application! Feel free to reach out with any questions regarding my technical decisions.*

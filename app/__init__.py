@@ -1,15 +1,9 @@
-import os
 from flask import Flask
 from app.config import Config
 from app.extensions import limiter
 
 def create_app():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    app = Flask(
-        __name__,
-        static_folder=os.path.join(base_dir, 'static'),
-        template_folder=os.path.join(base_dir, 'app', 'templates')
-    )
+    app = Flask(__name__)
     app.config.from_object(Config)
     app.config['MAX_CONTENT_LENGTH'] = Config.MAX_CONTENT_LENGTH
 
@@ -44,9 +38,5 @@ def create_app():
     app.register_blueprint(profile_bp,       url_prefix='/api/me')
     app.register_blueprint(import_export_bp, url_prefix='/api/data')
     app.register_blueprint(recurring_bp,     url_prefix='/api/recurring')
-
-    # ── Frontend views ────────────────────────────────────────────
-    from app.routes.views import views_bp
-    app.register_blueprint(views_bp)
 
     return app
