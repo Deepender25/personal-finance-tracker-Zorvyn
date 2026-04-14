@@ -1,7 +1,6 @@
 # 💰 FinanceDash — Personal Finance Tracker
 
 > **Enterprise-Grade Financial Dashboard & Access Control System**
-> *Submitted for the Zorvyn Backend Developer Internship Assessment*
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-RESTful-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com)
@@ -440,7 +439,7 @@ flowchart TD
 ## 📂 Directory Structure
 
 ```
-personal-finance-tracker-Zorvyn/
+personal-finance-tracker/
 │
 ├── app/                          # Backend application core
 │   ├── __init__.py               # Flask app factory, CORS, Limiter init
@@ -539,8 +538,8 @@ personal-finance-tracker-Zorvyn/
 ### Step 1 — Clone the Repository
 
 ```bash
-git clone https://github.com/Deepender25/personal-finance-tracker-Zorvyn.git
-cd personal-finance-tracker-Zorvyn
+git clone https://github.com/Deepender25/personal-finance-tracker.git
+cd personal-finance-tracker
 ```
 
 ---
@@ -709,9 +708,3 @@ This project directly addresses the following backend engineering competencies:
 > *Thank you for taking the time to review this submission. Every architectural decision in this project was intentional — from the layered service pattern to the active token blacklist. I am happy to walk through any part of the codebase in detail.*
 
 ---
-
-<div align="center">
-
-**Built with 🔥 for the Zorvyn Backend Developer Internship Assessment**
-
-</div>
