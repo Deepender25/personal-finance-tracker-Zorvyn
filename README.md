@@ -61,7 +61,7 @@
 | Role | Email | Password | Access Level |
 |---|---|---|---|
 | Admin | admin@demo.try | `admin123` | Full CRUD + user management |
-| Analyst | analyst@demo.try | `analyst123` | Read + analytics endpoints |
+| Analyst | analyst@demo.try | `analyst123` | Read + analytics endpoints | 
 | Viewer | viewer@demo.try | `viewer123` | Dashboard view only |
 
 > ⚠️ These credentials are for **assessment/demo purposes only** and are seeded via `scripts/seed.py`.
